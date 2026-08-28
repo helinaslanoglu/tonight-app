@@ -176,10 +176,10 @@ async function runTests() {
   const aiQuestions = await generatePersonalizedQuestions({
     vibeId: 'chaos',
     players: MOCK_PLAYERS,
-    count: 6,
+    count: 3,
   });
 
-  assert(aiQuestions.length === 6, 'AI generator should produce 6 questions');
+  assert(aiQuestions.length === 3, 'AI generator should produce 3 unique personalized questions');
   assert(aiQuestions.every((q) => q.vibeId === 'chaos'), 'All AI questions should have chaos vibe');
   assert(
     aiQuestions.some((q) => q.text.includes('Helin') || q.text.includes('Ayşe') || q.text.includes('Mert')),

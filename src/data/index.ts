@@ -1,4 +1,4 @@
-import { generatePersonalizedQuestions } from '@/services/ai-service';
+import { generatePersonalizedQuestions } from '@/services/ai';
 import type { GameMode, GameModeId, Player, Question, Vibe, VibeId } from '@/types';
 
 import { GAME_MODES } from './game-modes';
