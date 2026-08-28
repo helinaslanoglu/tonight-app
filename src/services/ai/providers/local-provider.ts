@@ -15,6 +15,8 @@ interface PersonalizedTemplate {
   optionA?: (p1: string, p2: string) => string;
   optionB?: (p1: string, p2: string) => string;
   prompt?: (p1: string, p2: string) => string;
+  agreeLabel?: string;
+  disagreeLabel?: string;
 }
 
 const TEMPLATES_BY_VIBE: Record<VibeId, PersonalizedTemplate[]> = {
@@ -30,13 +32,20 @@ const TEMPLATES_BY_VIBE: Record<VibeId, PersonalizedTemplate[]> = {
       text: (p1, p2) => `Between ${p1} and ${p2}, who is most likely to start a conga line with total strangers?`,
     },
     {
+      mode: 'hot-take',
+      text: (p1) => `${p1} has the most controversial music taste in this entire room.`,
+      agreeLabel: '100% FACTS',
+      disagreeLabel: 'TOTAL CAP',
+    },
+    {
+      mode: 'who-knows-me-best',
+      text: (p1) => `What is ${p1}'s absolute dream hype song when going out?`,
+      prompt: (p1) => `${p1} holds the answer. The rest of the group guesses!`,
+    },
+    {
       mode: 'open-question',
       text: (p1, p2) => `What is the wildest party story involving ${p1} or ${p2}?`,
       prompt: (p1, p2) => `${p1} and ${p2} must share their side of the story.`,
-    },
-    {
-      mode: 'most-likely-to',
-      text: (p1) => `Who in this room is most likely to get ${p1} kicked out of a VIP section?`,
     },
   ],
   funny: [
@@ -49,6 +58,17 @@ const TEMPLATES_BY_VIBE: Record<VibeId, PersonalizedTemplate[]> = {
     {
       mode: 'most-likely-to',
       text: (p1, p2) => `Who is more likely to accidentally send an embarrassing screenshot to the person it was about: ${p1} or ${p2}?`,
+    },
+    {
+      mode: 'hot-take',
+      text: (p1) => `${p1} would be the first person eliminated on a reality TV survival show.`,
+      agreeLabel: 'AGREE',
+      disagreeLabel: 'DISAGREE',
+    },
+    {
+      mode: 'who-knows-me-best',
+      text: (p1) => `What is ${p1}'s weirdest guilty pleasure snack?`,
+      prompt: (p1) => `Group guesses what ${p1} loves eating late at night!`,
     },
     {
       mode: 'open-question',
@@ -68,6 +88,12 @@ const TEMPLATES_BY_VIBE: Record<VibeId, PersonalizedTemplate[]> = {
       text: (p1, p2) => `If ${p1} and ${p2} were partners in crime, who gets caught within the first 10 minutes?`,
     },
     {
+      mode: 'hot-take',
+      text: (p1, p2) => `If ${p1} and ${p2} got into an argument, ${p1} would definitely win purely with volume.`,
+      agreeLabel: 'NO DOUBT',
+      disagreeLabel: 'FALSE',
+    },
+    {
       mode: 'open-question',
       text: (p1, p2) => `If ${p1} was arrested tomorrow, what would ${p2} immediately assume they did?`,
       prompt: (_, p2) => `${p2} must give a serious explanation with evidence.`,
@@ -85,6 +111,11 @@ const TEMPLATES_BY_VIBE: Record<VibeId, PersonalizedTemplate[]> = {
       text: (p1, p2) => `Who is most likely to fall head-over-heels after a single 20-minute conversation: ${p1} or ${p2}?`,
     },
     {
+      mode: 'who-knows-me-best',
+      text: (p1) => `What is ${p1}'s biggest pet peeve on a first date?`,
+      prompt: (p1) => `Everyone guess ${p1}'s instant dealbreaker!`,
+    },
+    {
       mode: 'open-question',
       text: (p1) => `What is the biggest romantic green flag that ${p1} brings into relationships?`,
       prompt: () => `Everyone call out their best genuine quality.`,
@@ -98,8 +129,9 @@ const TEMPLATES_BY_VIBE: Record<VibeId, PersonalizedTemplate[]> = {
       optionB: (_, p2) => `Trust life savings with ${p2}`,
     },
     {
-      mode: 'most-likely-to',
-      text: (p1, p2) => `Who gives wiser, more grounded life advice when things get tough: ${p1} or ${p2}?`,
+      mode: 'who-knows-me-best',
+      text: (p1) => `What is something that ${p1} is deeply passionate about that few people know?`,
+      prompt: (p1) => `Share what you think ${p1} cares most deeply about.`,
     },
     {
       mode: 'open-question',
@@ -115,8 +147,10 @@ const TEMPLATES_BY_VIBE: Record<VibeId, PersonalizedTemplate[]> = {
       optionB: (_, p2) => `Airport delay with ${p2}`,
     },
     {
-      mode: 'most-likely-to',
-      text: (p1, p2) => `Who has better taste in comfort food and late-night snacks: ${p1} or ${p2}?`,
+      mode: 'hot-take',
+      text: (p1) => `${p1} spends way more time deciding what movie to watch than actually watching it.`,
+      agreeLabel: '100% TRUE',
+      disagreeLabel: 'CAP',
     },
     {
       mode: 'open-question',
@@ -162,6 +196,23 @@ export class LocalSynthesizerProvider implements AIQuestionProvider {
           vibeId,
           gameModeId: 'most-likely-to',
           text: template.text(p1, p2, groupName),
+        });
+      } else if (template.mode === 'hot-take') {
+        questions.push({
+          id: qId,
+          vibeId,
+          gameModeId: 'hot-take',
+          text: template.text(p1, p2, groupName),
+          agreeLabel: template.agreeLabel || 'AGREE',
+          disagreeLabel: template.disagreeLabel || 'DISAGREE',
+        });
+      } else if (template.mode === 'who-knows-me-best') {
+        questions.push({
+          id: qId,
+          vibeId,
+          gameModeId: 'who-knows-me-best',
+          text: template.text(p1, p2, groupName),
+          prompt: template.prompt ? template.prompt(p1, p2) : 'Guess the truth!',
         });
       } else {
         questions.push({

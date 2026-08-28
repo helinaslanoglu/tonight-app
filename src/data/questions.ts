@@ -2,11 +2,11 @@ import type { Question } from '@/types';
 
 /**
  * Question dataset for Tonight party game.
- * Original questions categorized by vibe and game mode.
+ * Original questions across 5 game modes and 6 vibes.
  */
 export const QUESTIONS: Question[] = [
   // ─────────────────────────────────────────────────────────────────────────────
-  // WOULD YOU RATHER (20 Questions)
+  // 1. WOULD YOU RATHER
   // ─────────────────────────────────────────────────────────────────────────────
   {
     id: 'wyr-party-1',
@@ -25,6 +25,14 @@ export const QUESTIONS: Question[] = [
     optionB: 'Country music forever',
   },
   {
+    id: 'wyr-party-3',
+    vibeId: 'party',
+    gameModeId: 'would-you-rather',
+    text: 'Would you rather be the DJ with complete aux control or the VIP bartender with unlimited drinks?',
+    optionA: 'Aux Controller / DJ',
+    optionB: 'VIP Bartender',
+  },
+  {
     id: 'wyr-funny-1',
     vibeId: 'funny',
     gameModeId: 'would-you-rather',
@@ -41,6 +49,14 @@ export const QUESTIONS: Question[] = [
     optionB: 'Dramatic soap music',
   },
   {
+    id: 'wyr-funny-3',
+    vibeId: 'funny',
+    gameModeId: 'would-you-rather',
+    text: 'Would you rather sweat mayonnaise or sneeze glitter every single time?',
+    optionA: 'Mayo sweat',
+    optionB: 'Glitter sneeze',
+  },
+  {
     id: 'wyr-chaos-1',
     vibeId: 'chaos',
     gameModeId: 'would-you-rather',
@@ -55,6 +71,14 @@ export const QUESTIONS: Question[] = [
     text: 'Would you rather text your ex "I still think about us" or send a selfie to your boss with no context?',
     optionA: 'Text the ex',
     optionB: 'Selfie to boss',
+  },
+  {
+    id: 'wyr-chaos-3',
+    vibeId: 'chaos',
+    gameModeId: 'would-you-rather',
+    text: 'Would you rather swap lives with someone in this room for a week or switch bodies with your nemesis for a day?',
+    optionA: 'Someone here for a week',
+    optionB: 'Nemesis for a day',
   },
   {
     id: 'wyr-date-1',
@@ -104,57 +128,9 @@ export const QUESTIONS: Question[] = [
     optionA: 'Movie marathon',
     optionB: 'Board games & snacks',
   },
-  {
-    id: 'wyr-party-3',
-    vibeId: 'party',
-    gameModeId: 'would-you-rather',
-    text: 'Would you rather be the DJ with complete aux control or the bartender with unlimited free drinks?',
-    optionA: 'Aux Controller / DJ',
-    optionB: 'VIP Bartender',
-  },
-  {
-    id: 'wyr-chaos-3',
-    vibeId: 'chaos',
-    gameModeId: 'would-you-rather',
-    text: 'Would you rather swap lives with someone in this room for a week or switch bodies with your nemesis for a day?',
-    optionA: 'Someone here for a week',
-    optionB: 'Nemesis for a day',
-  },
-  {
-    id: 'wyr-funny-3',
-    vibeId: 'funny',
-    gameModeId: 'would-you-rather',
-    text: 'Would you rather sweat mayonnaise or sneeze glitter every single time?',
-    optionA: 'Mayo sweat',
-    optionB: 'Glitter sneeze',
-  },
-  {
-    id: 'wyr-date-3',
-    vibeId: 'date',
-    gameModeId: 'would-you-rather',
-    text: 'Would you rather your partner have a terrible laugh or terrible taste in movies?',
-    optionA: 'Goofy laugh',
-    optionB: 'Horrible movie taste',
-  },
-  {
-    id: 'wyr-deeptalk-3',
-    vibeId: 'deep-talk',
-    gameModeId: 'would-you-rather',
-    text: 'Would you rather restart your life from age 10 with all your current knowledge or jump 10 years ahead with $10M?',
-    optionA: 'Restart at 10 with wisdom',
-    optionB: 'Jump ahead with $10M',
-  },
-  {
-    id: 'wyr-chill-3',
-    vibeId: 'chill',
-    gameModeId: 'would-you-rather',
-    text: 'Would you rather live on a cozy cabin in the snowy mountains or a beachfront villa in the tropics?',
-    optionA: 'Mountain cabin',
-    optionB: 'Beach villa',
-  },
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // MOST LIKELY TO (20 Questions)
+  // 2. MOST LIKELY TO
   // ─────────────────────────────────────────────────────────────────────────────
   {
     id: 'mlt-party-1',
@@ -167,6 +143,12 @@ export const QUESTIONS: Question[] = [
     vibeId: 'party',
     gameModeId: 'most-likely-to',
     text: 'Who is most likely to order $200 worth of late-night fast food for everyone?',
+  },
+  {
+    id: 'mlt-party-3',
+    vibeId: 'party',
+    gameModeId: 'most-likely-to',
+    text: 'Who is most likely to dance on the table the moment the beat drops?',
   },
   {
     id: 'mlt-funny-1',
@@ -204,75 +186,114 @@ export const QUESTIONS: Question[] = [
     gameModeId: 'most-likely-to',
     text: 'Who is most likely to fall in love with someone solely based on their Spotify playlist?',
   },
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // 3. HOT TAKE
+  // ─────────────────────────────────────────────────────────────────────────────
   {
-    id: 'mlt-deeptalk-1',
-    vibeId: 'deep-talk',
-    gameModeId: 'most-likely-to',
-    text: 'Who is most likely to give life-changing advice during a 2 AM car ride?',
-  },
-  {
-    id: 'mlt-deeptalk-2',
-    vibeId: 'deep-talk',
-    gameModeId: 'most-likely-to',
-    text: 'Who is most likely to write a bestselling memoir about their life?',
-  },
-  {
-    id: 'mlt-chill-1',
-    vibeId: 'chill',
-    gameModeId: 'most-likely-to',
-    text: 'Who is most likely to cancel Friday plans to stay home in cozy sweatpants?',
-  },
-  {
-    id: 'mlt-chill-2',
-    vibeId: 'chill',
-    gameModeId: 'most-likely-to',
-    text: 'Who is most likely to fall asleep on the couch before the party even starts?',
-  },
-  {
-    id: 'mlt-party-3',
-    vibeId: 'party',
-    gameModeId: 'most-likely-to',
-    text: 'Who is most likely to dance on the table the moment the beat drops?',
-  },
-  {
-    id: 'mlt-chaos-3',
+    id: 'ht-chaos-1',
     vibeId: 'chaos',
-    gameModeId: 'most-likely-to',
-    text: 'Who is most likely to accidentally set off the fire alarm while making ramen?',
+    gameModeId: 'hot-take',
+    text: 'Pineapple on pizza is genuinely elite, and anyone who hates it is just following internet trends.',
+    agreeLabel: '100% FACTS',
+    disagreeLabel: 'TOTAL CAP',
   },
   {
-    id: 'mlt-funny-3',
+    id: 'ht-chaos-2',
+    vibeId: 'chaos',
+    gameModeId: 'hot-take',
+    text: 'Going to sleep at 9 PM on a Friday is vastly superior to going out to loud crowded clubs.',
+    agreeLabel: 'AGREE',
+    disagreeLabel: 'DISAGREE',
+  },
+  {
+    id: 'ht-party-1',
+    vibeId: 'party',
+    gameModeId: 'hot-take',
+    text: 'The pre-game is almost always more fun than the actual party or club itself.',
+    agreeLabel: 'FACTS',
+    disagreeLabel: 'NO WAY',
+  },
+  {
+    id: 'ht-party-2',
+    vibeId: 'party',
+    gameModeId: 'hot-take',
+    text: 'People who skip the song after 30 seconds on the aux should permanently lose aux privileges.',
+    agreeLabel: 'AGREE',
+    disagreeLabel: 'DISAGREE',
+  },
+  {
+    id: 'ht-funny-1',
     vibeId: 'funny',
-    gameModeId: 'most-likely-to',
-    text: 'Who is most likely to get banned from a laser tag arena for taking it too seriously?',
+    gameModeId: 'hot-take',
+    text: 'Leaving people on "read" is a basic human right and should not require any apology.',
+    agreeLabel: 'VALID TAKE',
+    disagreeLabel: 'RUDE AF',
   },
   {
-    id: 'mlt-date-3',
-    vibeId: 'date',
-    gameModeId: 'most-likely-to',
-    text: 'Who is most likely to accidentally text their crush a screenshot of their own conversation?',
+    id: 'ht-funny-2',
+    vibeId: 'funny',
+    gameModeId: 'hot-take',
+    text: 'Astrology is just modern superstition with aesthetic graphic design.',
+    agreeLabel: 'AGREE',
+    disagreeLabel: 'DISAGREE',
   },
   {
-    id: 'mlt-deeptalk-3',
-    vibeId: 'deep-talk',
-    gameModeId: 'most-likely-to',
-    text: 'Who is most likely to notice someone in the room is feeling down before anyone else?',
-  },
-  {
-    id: 'mlt-chill-3',
+    id: 'ht-chill-1',
     vibeId: 'chill',
-    gameModeId: 'most-likely-to',
-    text: 'Who has the best comfort food recipes in the group?',
+    gameModeId: 'hot-take',
+    text: 'Rewatching your comfort show 10 times is better than starting a new critically acclaimed series.',
+    agreeLabel: 'ABSOLUTELY',
+    disagreeLabel: 'NOPE',
   },
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // OPEN QUESTION (20 Questions)
+  // 4. WHO KNOWS ME BEST
+  // ─────────────────────────────────────────────────────────────────────────────
+  {
+    id: 'wkmb-party-1',
+    vibeId: 'party',
+    gameModeId: 'who-knows-me-best',
+    text: 'What is the spotlight player’s go-to drink order when celebrating?',
+    prompt: 'The spotlight player writes their answer mentally. The group guesses out loud!',
+  },
+  {
+    id: 'wkmb-party-2',
+    vibeId: 'party',
+    gameModeId: 'who-knows-me-best',
+    text: 'What song will guaranteed get the spotlight player running onto the dance floor?',
+    prompt: 'Everyone guess the song before the spotlight player reveals.',
+  },
+  {
+    id: 'wkmb-funny-1',
+    vibeId: 'funny',
+    gameModeId: 'who-knows-me-best',
+    text: 'What is the spotlight player’s weirdest pet peeve that instantly annoys them?',
+    prompt: 'Group guesses their pet peeve. Spotlight player confirms who was closest!',
+  },
+  {
+    id: 'wkmb-deeptalk-1',
+    vibeId: 'deep-talk',
+    gameModeId: 'who-knows-me-best',
+    text: 'What is the spotlight player’s dream bucket list travel destination?',
+    prompt: 'Take turns guessing their dream trip. Spotlight player grades the answers.',
+  },
+  {
+    id: 'wkmb-date-1',
+    vibeId: 'date',
+    gameModeId: 'who-knows-me-best',
+    text: 'What is the spotlight player’s ideal first date scenario?',
+    prompt: 'Group pitches what they think the perfect date is for them.',
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // 5. OPEN QUESTION
   // ─────────────────────────────────────────────────────────────────────────────
   {
     id: 'open-party-1',
     vibeId: 'party',
     gameModeId: 'open-question',
-    text: 'What is the absolute wildist night out story this group has ever experienced together?',
+    text: 'What is the absolute wildest night out story this group has ever experienced together?',
     prompt: 'Everyone take turns sharing your side of the story.',
   },
   {
@@ -290,25 +311,11 @@ export const QUESTIONS: Question[] = [
     prompt: 'Share and rank the best story in the room.',
   },
   {
-    id: 'open-funny-2',
-    vibeId: 'funny',
-    gameModeId: 'open-question',
-    text: 'What is a fashion trend you used to rock that makes you cringe into oblivion now?',
-    prompt: 'Describe the outfit in full detail.',
-  },
-  {
     id: 'open-chaos-1',
     vibeId: 'chaos',
     gameModeId: 'open-question',
     text: 'What is an unpopular opinion you have that would get you canceled in 5 minutes?',
     prompt: 'No judgment allowed — defend your take.',
-  },
-  {
-    id: 'open-chaos-2',
-    vibeId: 'chaos',
-    gameModeId: 'open-question',
-    text: 'If everyone in this room was trapped in an escape room, who gets us out and who gets us trapped forever?',
-    prompt: 'Assign roles to everyone in the room.',
   },
   {
     id: 'open-date-1',
@@ -318,13 +325,6 @@ export const QUESTIONS: Question[] = [
     prompt: 'Share what immediately makes someone 10x more attractive to you.',
   },
   {
-    id: 'open-date-2',
-    vibeId: 'date',
-    gameModeId: 'open-question',
-    text: 'What is the absolute worst pickup line or opening text someone has sent you?',
-    prompt: 'Recite it with full dramatic expression.',
-  },
-  {
     id: 'open-deeptalk-1',
     vibeId: 'deep-talk',
     gameModeId: 'open-question',
@@ -332,66 +332,10 @@ export const QUESTIONS: Question[] = [
     prompt: 'Take your time. Listen without interrupting.',
   },
   {
-    id: 'open-deeptalk-2',
-    vibeId: 'deep-talk',
-    gameModeId: 'open-question',
-    text: 'What was your dream when you were 12, and how has that dream evolved today?',
-    prompt: 'Reflect on who you wanted to become.',
-  },
-  {
     id: 'open-chill-1',
     vibeId: 'chill',
     gameModeId: 'open-question',
     text: 'What is your ultimate comfort song that never fails to reset your mood?',
     prompt: 'Play 10 seconds of it if you have your phone ready.',
-  },
-  {
-    id: 'open-chill-2',
-    vibeId: 'chill',
-    gameModeId: 'open-question',
-    text: 'What is one small, simple routine that brings you genuine peace during a hectic week?',
-    prompt: 'Share your personal favorite low-key ritual.',
-  },
-  {
-    id: 'open-party-3',
-    vibeId: 'party',
-    gameModeId: 'open-question',
-    text: 'What song immediately guarantees that you will run to the dance floor no matter what?',
-    prompt: 'Sing the opening line out loud.',
-  },
-  {
-    id: 'open-chaos-3',
-    vibeId: 'chaos',
-    gameModeId: 'open-question',
-    text: 'What is the weirdest impulse purchase you made at 2 AM that you still own?',
-    prompt: 'Defend why it was totally worth the money.',
-  },
-  {
-    id: 'open-funny-3',
-    vibeId: 'funny',
-    gameModeId: 'open-question',
-    text: 'If you had to change your name tomorrow to any object in this room, what is your new name?',
-    prompt: 'Everyone refer to them by that name for the next round.',
-  },
-  {
-    id: 'open-date-3',
-    vibeId: 'date',
-    gameModeId: 'open-question',
-    text: 'What is your favorite memory of someone doing something unexpectedly thoughtful for you?',
-    prompt: 'Give credit where credit is due.',
-  },
-  {
-    id: 'open-deeptalk-3',
-    vibeId: 'deep-talk',
-    gameModeId: 'open-question',
-    text: 'What is one trait you deeply respect about the person sitting to your left?',
-    prompt: 'Look them in the eye and tell them honestly.',
-  },
-  {
-    id: 'open-chill-3',
-    vibeId: 'chill',
-    gameModeId: 'open-question',
-    text: 'What is the most underrated movie or TV show that everyone should watch immediately?',
-    prompt: 'Pitch it in 30 seconds or less.',
   },
 ];

@@ -23,7 +23,7 @@ const INITIAL_SESSION: GameSession = {
   id: null,
   status: 'idle',
   vibeId: null,
-  gameModeId: null,
+  gameModeId: 'all',
   players: [],
   currentRound: 0,
   totalRounds: DEFAULT_TOTAL_ROUNDS,
@@ -46,8 +46,8 @@ interface GameActions {
   /** Replace the full player roster */
   setPlayers: (players: Player[]) => void;
 
-  /** Set game mode */
-  setGameMode: (gameModeId: GameModeId) => void;
+  /** Set game mode ('all' for shuffle/surprise or specific GameModeId) */
+  setGameMode: (gameModeId: GameModeId | 'all') => void;
 
   /** Transition session status */
   setSessionStatus: (status: SessionStatus) => void;
@@ -102,13 +102,14 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     const newSession = startNewSession({
       vibeId: session.vibeId,
       players: session.players,
+      gameModeId: session.gameModeId || 'all',
       totalRounds: session.totalRounds || DEFAULT_TOTAL_ROUNDS,
       questionPool: staticQuestions,
     });
 
     set({ session: newSession, questionPool: staticQuestions });
 
-    // 2. Asynchronous background AI question synthesis (adds personalized questions)
+    // 2. Asynchronous background AI question synthesis
     const vibeId = session.vibeId;
     const players = session.players;
     defaultContentProvider
@@ -136,11 +137,14 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       questionId: session.currentQuestion.id,
       gameModeId: session.currentQuestion.gameModeId,
       selectedPlayerId: partialAnswer?.selectedPlayerId,
+      targetPlayerId: partialAnswer?.targetPlayerId,
       selectedOption: partialAnswer?.selectedOption,
+      selectedStance: partialAnswer?.selectedStance,
       timestamp: Date.now(),
     };
 
-    const pool = questionPool.length > 0 ? questionPool : await defaultContentProvider.getQuestions();
+    const pool =
+      questionPool.length > 0 ? questionPool : await defaultContentProvider.getQuestions();
     const advancedSession = advanceSessionRound(session, answer, pool);
 
     set({ session: advancedSession });
@@ -181,6 +185,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
 export const useGameSession = () => useGameStore((s) => s.session);
 export const useSessionStatus = () => useGameStore((s) => s.session.status);
 export const useSelectedVibe = () => useGameStore((s) => s.session.vibeId);
+export const useSelectedGameMode = () => useGameStore((s) => s.session.gameModeId);
 export const usePlayers = () => useGameStore((s) => s.session.players);
 export const useCurrentRound = () => useGameStore((s) => s.session.currentRound);
 export const useTotalRounds = () => useGameStore((s) => s.session.totalRounds);
@@ -190,6 +195,7 @@ export const useIsGameCompleted = () => useGameStore((s) => s.session.status ===
 // Action hooks with stable references
 export const useSetVibe = () => useGameStore((s) => s.setVibe);
 export const useSetPlayers = () => useGameStore((s) => s.setPlayers);
+export const useSetGameMode = () => useGameStore((s) => s.setGameMode);
 export const useStartGame = () => useGameStore((s) => s.startGame);
 export const useAnswerAndAdvance = () => useGameStore((s) => s.submitAnswerAndAdvance);
 export const useReplayGame = () => useGameStore((s) => s.replayGame);

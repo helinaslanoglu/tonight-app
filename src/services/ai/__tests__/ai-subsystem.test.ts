@@ -64,8 +64,30 @@ async function runAISubsystemTests() {
   };
   const valResult3 = validateAndSanitizeQuestion(identicalWYR);
   assert(!valResult3.isValid, 'Identical WYR options must be rejected');
+  // Valid Hot Take
+  const validHT = {
+    id: 'ai-ht-1',
+    vibeId: 'chaos',
+    gameModeId: 'hot-take',
+    text: 'Pineapple on pizza is an elite lifestyle choice.',
+    agreeLabel: ' FACTS ',
+    disagreeLabel: ' CAP ',
+  };
+  const valResult4 = validateAndSanitizeQuestion(validHT);
+  assert(valResult4.isValid, 'Valid Hot Take should pass validation');
+  assert((valResult4.sanitizedQuestion as any).agreeLabel === 'FACTS', 'Agree label should be sanitized');
 
-  console.log('✅ Test 1: Schema validation & sanitization verified.');
+  // Valid Who Knows Me Best
+  const validWKMB = {
+    id: 'ai-wkmb-1',
+    vibeId: 'party',
+    gameModeId: 'who-knows-me-best',
+    text: 'What is Helin’s dream celebrity party guest?',
+  };
+  const valResult5 = validateAndSanitizeQuestion(validWKMB);
+  assert(valResult5.isValid, 'Valid Who Knows Me Best should pass validation');
+
+  console.log('✅ Test 1: Schema validation & sanitization verified across all game modes.');
 
   // ─── Test 2: Deduplication & Semantic Filtering ─────────────────────────────
   const existingPool: Question[] = [

@@ -105,5 +105,35 @@ export function validateAndSanitizeQuestion(raw: unknown): AIValidationResult {
     };
   }
 
+  if (mode === 'hot-take') {
+    const cleanAgree = typeof q.agreeLabel === 'string' ? sanitizeString(q.agreeLabel) : undefined;
+    const cleanDisagree = typeof q.disagreeLabel === 'string' ? sanitizeString(q.disagreeLabel) : undefined;
+    return {
+      isValid: true,
+      sanitizedQuestion: {
+        id,
+        vibeId: q.vibeId as Question['vibeId'],
+        gameModeId: 'hot-take',
+        text: cleanText,
+        agreeLabel: cleanAgree && cleanAgree.length > 0 ? cleanAgree : 'AGREE',
+        disagreeLabel: cleanDisagree && cleanDisagree.length > 0 ? cleanDisagree : 'DISAGREE',
+      },
+    };
+  }
+
+  if (mode === 'who-knows-me-best') {
+    const cleanPrompt = typeof q.prompt === 'string' ? sanitizeString(q.prompt) : undefined;
+    return {
+      isValid: true,
+      sanitizedQuestion: {
+        id,
+        vibeId: q.vibeId as Question['vibeId'],
+        gameModeId: 'who-knows-me-best',
+        text: cleanText,
+        prompt: cleanPrompt && cleanPrompt.length > 0 ? cleanPrompt : undefined,
+      },
+    };
+  }
+
   return { isValid: false, reason: `Unsupported gameModeId: ${String(mode)}` };
 }

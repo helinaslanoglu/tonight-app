@@ -5,7 +5,7 @@ import { GAME_MODES } from './game-modes';
 import { QUESTIONS } from './questions';
 import { VIBES } from './vibes';
 
-export { GAME_MODES } from './game-modes';
+export { GAME_MODES, getCompatibleGameModes, getGameModeById } from './game-modes';
 export { QUESTIONS } from './questions';
 export { VIBES } from './vibes';
 

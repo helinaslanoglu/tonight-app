@@ -16,7 +16,7 @@ import { Badge } from '@/components/ui/Badge';
 import { IconButton } from '@/components/ui/IconButton';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { VIBES } from '@/data';
-import { usePlayers, useSelectedVibe, useSetPlayers, useStartGame } from '@/store';
+import { usePlayers, useSelectedVibe, useSetPlayers } from '@/store';
 import { getVibeColor, theme } from '@/theme';
 import type { Player } from '@/types';
 import { generatePlayerId } from '@/utils';
@@ -38,7 +38,6 @@ export default function GameSetupScreen() {
   const selectedVibeId = useSelectedVibe();
   const existingPlayers = usePlayers();
   const setPlayers = useSetPlayers();
-  const startGame = useStartGame();
 
   const activeVibe = VIBES.find((v) => v.id === selectedVibeId);
   const vibeColor = selectedVibeId ? getVibeColor(selectedVibeId) : theme.colors.accent;
@@ -112,7 +111,7 @@ export default function GameSetupScreen() {
     return allFilled && uniqueNames;
   }, [activeNames]);
 
-  const handleStartGame = async () => {
+  const handleContinue = () => {
     if (!isFormValid) return;
 
     // Create stable player objects with unique IDs
@@ -126,8 +125,7 @@ export default function GameSetupScreen() {
     });
 
     setPlayers(playersToSave);
-    await startGame();
-    router.push('/game');
+    router.push('/game-mode');
   };
 
   return (
@@ -237,10 +235,10 @@ export default function GameSetupScreen() {
             size="lg"
             fullWidth
             disabled={!isFormValid}
-            onPress={handleStartGame}
+            onPress={handleContinue}
             style={isFormValid ? styles.startButtonActive : undefined}
           >
-            START GAME
+            CHOOSE GAME MODE
           </AppButton>
         </Animated.View>
       </ScreenContainer>

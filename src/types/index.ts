@@ -36,17 +36,25 @@ export type GameModeId =
   | 'would-you-rather'
   | 'most-likely-to'
   | 'open-question'
-  | 'classic'
-  | 'truth-or-dare'
-  | 'hot-seat'
-  | 'rapid-fire';
+  | 'hot-take'
+  | 'who-knows-me-best';
+
+export type GameModeInteractionType =
+  | 'choice'           // Would You Rather (Option A vs B)
+  | 'player-select'    // Most Likely To (Pick a player)
+  | 'discussion'       // Open Question (Prompt discussion)
+  | 'stance'           // Hot Take (Agree vs Disagree)
+  | 'spotlight-quiz';  // Who Knows Me Best (Spotlight player + guess)
 
 export interface GameMode {
   id: GameModeId;
   label: string;
+  tagline: string;
   description: string;
   emoji: string;
   minPlayers: number;
+  supportedVibes: VibeId[];
+  interactionType: GameModeInteractionType;
 }
 
 // ─── Question (Discriminated Union) ───────────────────────────────────────────
@@ -72,10 +80,23 @@ export interface OpenQuestion extends BaseQuestion {
   prompt?: string;
 }
 
+export interface HotTakeQuestion extends BaseQuestion {
+  gameModeId: 'hot-take';
+  agreeLabel?: string;
+  disagreeLabel?: string;
+}
+
+export interface WhoKnowsMeBestQuestion extends BaseQuestion {
+  gameModeId: 'who-knows-me-best';
+  prompt?: string;
+}
+
 export type Question =
   | WouldYouRatherQuestion
   | MostLikelyToQuestion
-  | OpenQuestion;
+  | OpenQuestion
+  | HotTakeQuestion
+  | WhoKnowsMeBestQuestion;
 
 // ─── Round Answers ────────────────────────────────────────────────────────────
 
@@ -84,7 +105,9 @@ export interface RoundAnswer {
   questionId: string;
   gameModeId: GameModeId;
   selectedPlayerId?: string;
+  targetPlayerId?: string;
   selectedOption?: 'A' | 'B';
+  selectedStance?: 'agree' | 'disagree';
   timestamp: number;
 }
 
@@ -97,7 +120,7 @@ export interface GameSession {
   id: string | null;
   status: SessionStatus;
   vibeId: VibeId | null;
-  gameModeId: GameModeId | null;
+  gameModeId: GameModeId | 'all' | null;
   players: Player[];
   currentRound: number;
   totalRounds: number;
@@ -111,6 +134,7 @@ export interface GameSession {
 export interface GameResult {
   sessionId: string;
   vibeId: VibeId;
+  gameModeId: GameModeId | 'all';
   totalRounds: number;
   roundsCompleted: number;
   playerCount: number;

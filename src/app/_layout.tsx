@@ -20,6 +20,7 @@ export default function RootLayout() {
         <Stack.Screen name="index" />
         <Stack.Screen name="vibes" />
         <Stack.Screen name="game-setup" />
+        <Stack.Screen name="game-mode" />
         <Stack.Screen name="game" />
       </Stack>
     </SafeAreaProvider>

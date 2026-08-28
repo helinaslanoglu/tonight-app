@@ -1,16 +1,25 @@
 /**
  * Game Engine Domain Logic Automated Test Suite
- * Validates question selection, round progression, replay, validation, and Hybrid AI generation.
+ * Validates:
+ * 1. Question selection & pool availability
+ * 2. Mode compatibility with vibes & player counts
+ * 3. Random mode selection logic
+ * 4. Duplicate prevention across rounds
+ * 5. Session lifecycle (create, advance, complete, replay)
+ * 6. Interaction validation across all 5 game modes
+ * 7. Hybrid AI generation
  */
 
 import { QUESTIONS } from '../data/questions';
 import { generatePersonalizedQuestions } from '../services/ai-service';
-import type { Player, Question, VibeId } from '../types';
+import type { HotTakeQuestion, Player, Question, VibeId, WhoKnowsMeBestQuestion } from '../types';
 import {
   advanceSessionRound,
   DEFAULT_TOTAL_ROUNDS,
+  getCompatibleGameModes,
   replaySession,
   selectNextQuestion,
+  selectRandomCompatibleGameMode,
   startNewSession,
   validateAnswerForQuestion,
 } from './game-engine';
@@ -64,10 +73,11 @@ async function runTests() {
   assert(qFallback !== null, 'Exhausted pool should gracefully return fallback question');
   console.log('✅ Test 4: Pool exhaustion graceful fallback verified.');
 
-  // ─── Test 5: Session Creation ───────────────────────────────────────────────
+  // ─── Test 5: Session Creation with Mode ─────────────────────────────────────
   const session = startNewSession({
     vibeId: 'party',
     players: MOCK_PLAYERS,
+    gameModeId: 'would-you-rather',
     totalRounds: DEFAULT_TOTAL_ROUNDS,
     questionPool: QUESTIONS,
   });
@@ -75,10 +85,11 @@ async function runTests() {
   assert(session.status === 'playing', 'New session should be playing');
   assert(session.currentRound === 1, 'New session should start at round 1');
   assert(session.totalRounds === 10, 'Total rounds should default to 10');
+  assert(session.gameModeId === 'would-you-rather', 'Game mode should be recorded');
   assert(session.players.length === 3, 'Players count should match');
   assert(session.currentQuestion !== null, 'Initial question should be populated');
   assert(session.usedQuestionIds.length === 1, 'usedQuestionIds should contain 1 question');
-  console.log('✅ Test 5: Session creation verified.');
+  console.log('✅ Test 5: Session creation with specified mode verified.');
 
   // ─── Test 6: Round Progression Loop ─────────────────────────────────────────
   let currentSession = session;
@@ -120,12 +131,13 @@ async function runTests() {
   assert(replayedSession.status === 'playing', 'Replayed session should be playing');
   assert(replayedSession.currentRound === 1, 'Replayed session should reset to round 1');
   assert(replayedSession.vibeId === 'party', 'Replayed session should preserve vibe');
+  assert(replayedSession.gameModeId === 'would-you-rather', 'Replayed session should preserve mode');
   assert(replayedSession.players.length === 3, 'Replayed session should preserve players');
   assert(replayedSession.id !== completedSession.id, 'Replayed session should have a new ID');
   assert(replayedSession.usedQuestionIds.length === 1, 'Replayed session should reset usedQuestionIds');
-  console.log('✅ Test 8: Replay session verified (preserves vibe & players, resets rounds & IDs).');
+  console.log('✅ Test 8: Replay session verified (preserves vibe, mode & players, resets rounds & IDs).');
 
-  // ─── Test 9: Answer Validation ──────────────────────────────────────────────
+  // ─── Test 9: Answer Validation Across 5 Game Modes ──────────────────────────
   const wyrQ: Question = {
     id: 'wyr-1',
     vibeId: 'party',
@@ -139,6 +151,18 @@ async function runTests() {
     vibeId: 'party',
     gameModeId: 'most-likely-to',
     text: 'Test MLT',
+  };
+  const htQ: HotTakeQuestion = {
+    id: 'ht-1',
+    vibeId: 'chaos',
+    gameModeId: 'hot-take',
+    text: 'Test Hot Take',
+  };
+  const wkmbQ: WhoKnowsMeBestQuestion = {
+    id: 'wkmb-1',
+    vibeId: 'party',
+    gameModeId: 'who-knows-me-best',
+    text: 'Test Who Knows Me Best',
   };
   const openQ: Question = {
     id: 'open-1',
@@ -154,8 +178,13 @@ async function runTests() {
   assert(!validateAnswerForQuestion(mltQ, {}), 'MLT should be invalid without selected player');
   assert(validateAnswerForQuestion(mltQ, { selectedPlayerId: 'p1' }), 'MLT should be valid with player');
 
-  assert(validateAnswerForQuestion(openQ, {}), 'Open Question is always valid');
-  console.log('✅ Test 9: Interaction validation rules verified across all 3 game modes.');
+  assert(!validateAnswerForQuestion(htQ, {}), 'Hot Take should be invalid without stance');
+  assert(validateAnswerForQuestion(htQ, { selectedStance: 'agree' }), 'Hot Take should be valid with agree');
+  assert(validateAnswerForQuestion(htQ, { selectedStance: 'disagree' }), 'Hot Take should be valid with disagree');
+
+  assert(validateAnswerForQuestion(wkmbQ, {}), 'Who Knows Me Best is valid');
+  assert(validateAnswerForQuestion(openQ, {}), 'Open Question is valid');
+  console.log('✅ Test 9: Interaction validation verified across all 5 game modes.');
 
   // ─── Test 10: Invalid State Guards ──────────────────────────────────────────
   let threwInvalidPlayer = false;
@@ -172,7 +201,17 @@ async function runTests() {
   assert(threwInvalidPlayer, 'startNewSession should throw if less than 2 players');
   console.log('✅ Test 10: Guard against insufficient players verified.');
 
-  // ─── Test 11: Hybrid AI Question Generation ─────────────────────────────────
+  // ─── Test 11: Mode Compatibility by Vibe ────────────────────────────────────
+  const partyModes = getCompatibleGameModes('party', 3);
+  assert(partyModes.some((m) => m.id === 'most-likely-to'), 'Party should include most-likely-to');
+  assert(partyModes.some((m) => m.id === 'hot-take'), 'Party should include hot-take');
+  assert(partyModes.some((m) => m.id === 'who-knows-me-best'), 'Party should include who-knows-me-best');
+
+  const randomMode = selectRandomCompatibleGameMode('party', 3, 'most-likely-to');
+  assert(randomMode !== 'most-likely-to', 'Random mode selector should exclude previous mode when alternatives exist');
+  console.log('✅ Test 11: Mode compatibility & random mode selection verified.');
+
+  // ─── Test 12: Hybrid AI Question Generation ─────────────────────────────────
   const aiQuestions = await generatePersonalizedQuestions({
     vibeId: 'chaos',
     players: MOCK_PLAYERS,
@@ -185,9 +224,9 @@ async function runTests() {
     aiQuestions.some((q) => q.text.includes('Helin') || q.text.includes('Ayşe') || q.text.includes('Mert')),
     'AI questions should reference actual player names'
   );
-  console.log('✅ Test 11: Hybrid AI Personalized Question Generation verified.');
+  console.log('✅ Test 12: Hybrid AI Personalized Question Generation verified.');
 
-  console.log('\n🎉 ALL 11 DOMAIN & AI ENGINE TESTS PASSED SUCCESSFULLY!');
+  console.log('\n🎉 ALL 12 DOMAIN & GAME MODE ENGINE TESTS PASSED SUCCESSFULLY!');
 }
 
 runTests().catch((err) => {

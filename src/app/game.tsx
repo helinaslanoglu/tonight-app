@@ -2,12 +2,18 @@ import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
   Alert,
-  Pressable,
   StyleSheet,
   View,
 } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
+import {
+  HotTakeInteraction,
+  MostLikelyToInteraction,
+  OpenQuestionInteraction,
+  WhoKnowsMeBestInteraction,
+  WouldYouRatherInteraction,
+} from '@/components/game';
 import { AppButton } from '@/components/ui/AppButton';
 import { AppCard } from '@/components/ui/AppCard';
 import { AppText } from '@/components/ui/AppText';
@@ -29,7 +35,12 @@ import {
   useTotalRounds,
 } from '@/store';
 import { getVibeColor, theme } from '@/theme';
-import type { WouldYouRatherQuestion } from '@/types';
+import type {
+  HotTakeQuestion,
+  OpenQuestion,
+  WhoKnowsMeBestQuestion,
+  WouldYouRatherQuestion,
+} from '@/types';
 
 export default function GameScreen() {
   const router = useRouter();
@@ -48,17 +59,19 @@ export default function GameScreen() {
   // Local selection state for current round
   const [selectedOption, setSelectedOption] = useState<'A' | 'B' | undefined>(undefined);
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | undefined>(undefined);
+  const [selectedStance, setSelectedStance] = useState<'agree' | 'disagree' | undefined>(undefined);
+  const [spotlightPlayerId, setSpotlightPlayerId] = useState<string | undefined>(undefined);
   const [isAdvancing, setIsAdvancing] = useState(false);
 
   const activeVibe = VIBES.find((v) => v.id === selectedVibeId);
   const vibeColor = selectedVibeId ? getVibeColor(selectedVibeId) : theme.colors.accent;
-
   const currentMode = GAME_MODES.find((m) => m.id === currentQuestion?.gameModeId);
 
   // Validation
   const canAdvance = validateAnswerForQuestion(currentQuestion, {
     selectedOption,
     selectedPlayerId,
+    selectedStance,
   });
 
   const handleNext = async () => {
@@ -68,15 +81,23 @@ export default function GameScreen() {
     await answerAndAdvance({
       selectedOption,
       selectedPlayerId,
+      selectedStance,
+      targetPlayerId: spotlightPlayerId,
     });
+
+    // Reset interaction state for next round
     setSelectedOption(undefined);
     setSelectedPlayerId(undefined);
+    setSelectedStance(undefined);
+    setSpotlightPlayerId(undefined);
     setIsAdvancing(false);
   };
 
   const handleReplay = async () => {
     setSelectedOption(undefined);
     setSelectedPlayerId(undefined);
+    setSelectedStance(undefined);
+    setSpotlightPlayerId(undefined);
     setIsAdvancing(false);
     await replayGame();
   };
@@ -183,10 +204,10 @@ export default function GameScreen() {
             variant="secondary"
             size="md"
             fullWidth
-            onPress={() => router.push('/vibes')}
+            onPress={() => router.push('/game-mode')}
             style={styles.secondaryCta}
           >
-            CHANGE VIBE
+            CHANGE MODE
           </AppButton>
           <AppButton
             variant="ghost"
@@ -253,124 +274,41 @@ export default function GameScreen() {
 
           {/* Mode-Specific Interaction Area */}
           <View style={styles.interactionArea}>
-            {/* 1. WOULD YOU RATHER */}
             {currentQuestion.gameModeId === 'would-you-rather' && (
-              <View style={styles.wyrContainer}>
-                <Pressable
-                  onPress={() => setSelectedOption('A')}
-                  accessibilityRole="radio"
-                  accessibilityState={{ selected: selectedOption === 'A' }}
-                  accessibilityLabel={`Option A: ${(currentQuestion as WouldYouRatherQuestion).optionA}`}
-                  style={[
-                    styles.wyrOption,
-                    selectedOption === 'A' ? styles.wyrOptionSelected : styles.wyrOptionUnselected,
-                  ]}
-                >
-                  <AppText variant="overline" color="secondary" style={styles.optionTag}>
-                    OPTION A
-                  </AppText>
-                  <AppText
-                    variant="label"
-                    style={[
-                      styles.wyrOptionText,
-                      selectedOption === 'A' && styles.wyrOptionTextSelected,
-                    ]}
-                  >
-                    {(currentQuestion as WouldYouRatherQuestion).optionA}
-                  </AppText>
-                </Pressable>
-
-                <View style={styles.vsBadge}>
-                  <AppText variant="overline" style={styles.vsText}>
-                    VS
-                  </AppText>
-                </View>
-
-                <Pressable
-                  onPress={() => setSelectedOption('B')}
-                  accessibilityRole="radio"
-                  accessibilityState={{ selected: selectedOption === 'B' }}
-                  accessibilityLabel={`Option B: ${(currentQuestion as WouldYouRatherQuestion).optionB}`}
-                  style={[
-                    styles.wyrOption,
-                    selectedOption === 'B' ? styles.wyrOptionSelected : styles.wyrOptionUnselected,
-                  ]}
-                >
-                  <AppText variant="overline" color="secondary" style={styles.optionTag}>
-                    OPTION B
-                  </AppText>
-                  <AppText
-                    variant="label"
-                    style={[
-                      styles.wyrOptionText,
-                      selectedOption === 'B' && styles.wyrOptionTextSelected,
-                    ]}
-                  >
-                    {(currentQuestion as WouldYouRatherQuestion).optionB}
-                  </AppText>
-                </Pressable>
-              </View>
+              <WouldYouRatherInteraction
+                question={currentQuestion as WouldYouRatherQuestion}
+                selectedOption={selectedOption}
+                onSelectOption={(opt) => setSelectedOption(opt)}
+              />
             )}
 
-            {/* 2. MOST LIKELY TO */}
             {currentQuestion.gameModeId === 'most-likely-to' && (
-              <View style={styles.mltContainer}>
-                <AppText variant="caption" color="secondary" style={styles.interactionPrompt}>
-                  Tap who in the room fits best:
-                </AppText>
-                <View style={styles.mltGrid}>
-                  {players.map((player) => {
-                    const isSelected = selectedPlayerId === player.id;
-                    const pColor = player.color || theme.colors.accent;
-
-                    return (
-                      <Pressable
-                        key={player.id}
-                        onPress={() => setSelectedPlayerId(player.id)}
-                        accessibilityRole="radio"
-                        accessibilityState={{ selected: isSelected }}
-                        accessibilityLabel={`Vote for ${player.name}`}
-                        style={[
-                          styles.playerVoteCard,
-                          isSelected
-                            ? [styles.playerVoteCardSelected, { borderColor: pColor }]
-                            : styles.playerVoteCardUnselected,
-                        ]}
-                      >
-                        <View style={[styles.playerVoteAvatar, { backgroundColor: pColor }]}>
-                          <AppText style={styles.playerVoteInitial}>
-                            {player.name.charAt(0).toUpperCase()}
-                          </AppText>
-                        </View>
-                        <AppText
-                          variant="label"
-                          numberOfLines={1}
-                          style={[
-                            styles.playerVoteName,
-                            isSelected && { color: theme.colors.text.primary, fontWeight: '700' },
-                          ]}
-                        >
-                          {player.name}
-                        </AppText>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              </View>
+              <MostLikelyToInteraction
+                players={players}
+                selectedPlayerId={selectedPlayerId}
+                onSelectPlayer={(id) => setSelectedPlayerId(id)}
+              />
             )}
 
-            {/* 3. OPEN QUESTION */}
+            {currentQuestion.gameModeId === 'hot-take' && (
+              <HotTakeInteraction
+                question={currentQuestion as HotTakeQuestion}
+                selectedStance={selectedStance}
+                onSelectStance={(stance) => setSelectedStance(stance)}
+              />
+            )}
+
+            {currentQuestion.gameModeId === 'who-knows-me-best' && (
+              <WhoKnowsMeBestInteraction
+                question={currentQuestion as WhoKnowsMeBestQuestion}
+                players={players}
+                spotlightPlayerId={spotlightPlayerId}
+                onSelectSpotlightPlayer={(id) => setSpotlightPlayerId(id)}
+              />
+            )}
+
             {currentQuestion.gameModeId === 'open-question' && (
-              <View style={styles.openContainer}>
-                <AppCard variant="default" padding="lg" style={styles.openPromptCard}>
-                  <AppText variant="overline" color="accent" style={styles.openPromptTag}>
-                    GROUP DISCUSSION
-                  </AppText>
-                  <AppText variant="body" color="secondary" style={styles.openPromptText}>
-                    {currentQuestion.prompt || 'Everyone share your thoughts and debate the answers.'}
-                  </AppText>
-                </AppCard>
-              </View>
+              <OpenQuestionInteraction question={currentQuestion as OpenQuestion} />
             )}
           </View>
         </Animated.View>
@@ -448,117 +386,6 @@ const styles = StyleSheet.create({
   interactionArea: {
     width: '100%',
   },
-  interactionPrompt: {
-    marginBottom: theme.spacing.sm,
-    textAlign: 'center',
-  },
-
-  // ─── WYR Styles ─────────────────────────────────────────────────────────────
-  wyrContainer: {
-    gap: theme.spacing.sm,
-    alignItems: 'center',
-  },
-  wyrOption: {
-    width: '100%',
-    padding: theme.spacing.md,
-    borderRadius: theme.radius.lg,
-    borderWidth: 1.5,
-  },
-  wyrOptionUnselected: {
-    backgroundColor: theme.colors.surface,
-    borderColor: theme.colors.border,
-  },
-  wyrOptionSelected: {
-    backgroundColor: theme.colors.surfaceElevated,
-    borderColor: theme.colors.accent,
-    ...theme.shadow.glow,
-  },
-  optionTag: {
-    marginBottom: 4,
-  },
-  wyrOptionText: {
-    color: theme.colors.text.secondary,
-  },
-  wyrOptionTextSelected: {
-    color: theme.colors.text.primary,
-    fontWeight: theme.typography.weight.bold,
-  },
-  vsBadge: {
-    paddingVertical: 2,
-    paddingHorizontal: theme.spacing.sm,
-    backgroundColor: theme.colors.surfaceElevated,
-    borderRadius: theme.radius.full,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-  },
-  vsText: {
-    fontSize: 10,
-    color: theme.colors.text.tertiary,
-  },
-
-  // ─── MLT Styles ─────────────────────────────────────────────────────────────
-  mltContainer: {
-    width: '100%',
-  },
-  mltGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: theme.spacing.sm,
-  },
-  playerVoteCard: {
-    flexBasis: '48%',
-    flexGrow: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.sm,
-    padding: theme.spacing.md,
-    borderRadius: theme.radius.lg,
-    borderWidth: 1.5,
-  },
-  playerVoteCardUnselected: {
-    backgroundColor: theme.colors.surface,
-    borderColor: theme.colors.border,
-  },
-  playerVoteCardSelected: {
-    backgroundColor: theme.colors.surfaceElevated,
-    ...theme.shadow.glow,
-  },
-  playerVoteAvatar: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  playerVoteInitial: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: theme.typography.weight.bold,
-  },
-  playerVoteName: {
-    color: theme.colors.text.secondary,
-    flex: 1,
-  },
-
-  // ─── Open Prompt Styles ─────────────────────────────────────────────────────
-  openContainer: {
-    width: '100%',
-  },
-  openPromptCard: {
-    borderRadius: theme.radius.lg,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    alignItems: 'center',
-    gap: theme.spacing.xs,
-  },
-  openPromptTag: {
-    letterSpacing: 1.2,
-  },
-  openPromptText: {
-    textAlign: 'center',
-  },
-
-  // ─── Bottom & Completion Styles ────────────────────────────────────────────
   bottomArea: {
     marginTop: 'auto',
     paddingTop: theme.spacing.sm,
