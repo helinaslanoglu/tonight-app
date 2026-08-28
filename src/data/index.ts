@@ -1,5 +1,9 @@
 import type { GameMode, GameModeId, Question, Vibe, VibeId } from '@/types';
 
+import { VIBES } from './vibes';
+
+export { VIBES } from './vibes';
+
 /**
  * Data Access Layer (Boundary Contract)
  * ──────────────────────────────────────
@@ -26,12 +30,11 @@ export interface ContentProvider {
 }
 
 /**
- * Default local content provider stub.
- * Concrete question banks and vibe metadata will be populated in Milestone 3+.
+ * Default local content provider.
  */
 export const defaultContentProvider: ContentProvider = {
   getVibes: async (): Promise<Vibe[]> => {
-    return [];
+    return VIBES;
   },
 
   getGameModes: async (): Promise<GameMode[]> => {

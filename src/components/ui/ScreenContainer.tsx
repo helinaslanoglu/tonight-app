@@ -1,29 +1,3 @@
-/**
- * ScreenContainer — Tonight's standard screen wrapper.
- *
- * Handles:
- *  - Background color (always Tonight dark)
- *  - Safe area insets
- *  - Optional scroll behavior
- *  - Consistent horizontal padding
- *
- * Usage:
- *   // Fixed layout (non-scrollable)
- *   <ScreenContainer>
- *     <AppText variant="heading">Hello</AppText>
- *   </ScreenContainer>
- *
- *   // Scrollable screen
- *   <ScreenContainer scrollable>
- *     {content}
- *   </ScreenContainer>
- *
- *   // No horizontal padding (e.g. full-bleed sections)
- *   <ScreenContainer disablePadding>
- *     {content}
- *   </ScreenContainer>
- */
-
 import React from 'react';
 import {
   KeyboardAvoidingView,
@@ -38,8 +12,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { theme } from '@/theme';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
 export interface ScreenContainerProps {
   /** Wraps content in a ScrollView */
   scrollable?: boolean;
@@ -52,8 +24,6 @@ export interface ScreenContainerProps {
   children?: React.ReactNode;
 }
 
-// ─── Component ────────────────────────────────────────────────────────────────
-
 export function ScreenContainer({
   scrollable = false,
   disablePadding = false,
@@ -63,12 +33,15 @@ export function ScreenContainer({
 }: ScreenContainerProps) {
   const insets = useSafeAreaInsets();
 
+  const topInset = insets?.top ?? 0;
+  const bottomInset = insets?.bottom ?? 0;
+
   const innerStyle: StyleProp<ViewStyle> = [
     styles.inner,
     !disablePadding && styles.padded,
     {
-      paddingTop: insets.top + theme.spacing.md,
-      paddingBottom: insets.bottom + theme.spacing.md,
+      paddingTop: topInset + theme.spacing.md,
+      paddingBottom: bottomInset + theme.spacing.md,
     },
     contentStyle,
   ];
@@ -76,7 +49,7 @@ export function ScreenContainer({
   const content = scrollable ? (
     <ScrollView
       style={styles.scroll}
-      contentContainerStyle={innerStyle}
+      contentContainerStyle={[innerStyle, styles.scrollContent]}
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
     >
@@ -86,18 +59,18 @@ export function ScreenContainer({
     <View style={innerStyle}>{children}</View>
   );
 
-  const wrapper = avoidKeyboard ? (
-    <KeyboardAvoidingView
-      style={styles.root}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      {content}
-    </KeyboardAvoidingView>
-  ) : (
-    <View style={styles.root}>{content}</View>
-  );
+  if (avoidKeyboard) {
+    return (
+      <KeyboardAvoidingView
+        style={styles.root}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        {content}
+      </KeyboardAvoidingView>
+    );
+  }
 
-  return wrapper;
+  return <View style={styles.root}>{content}</View>;
 }
 
 const styles = StyleSheet.create({
@@ -109,8 +82,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: theme.colors.bg,
   },
-  inner: {
+  scrollContent: {
     flexGrow: 1,
+  },
+  inner: {
+    flex: 1,
   },
   padded: {
     paddingHorizontal: theme.spacing.lg,

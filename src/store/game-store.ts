@@ -97,8 +97,8 @@ export const useGameStore = create<GameState & GameActions>((set) => ({
     set({ session: { ...INITIAL_SESSION, id: null } }),
 }));
 
-// ─── Atomic Selector Hooks (Performance Optimization) ─────────────────────────
-// Using fine-grained selectors prevents full-tree re-renders when unrelated state slices change.
+// ─── Atomic Selector Hooks (Performance Optimized) ───────────────────────────
+// Fine-grained selectors return primitive/stable references to prevent re-renders.
 
 export const useGameSession = () => useGameStore((s) => s.session);
 export const useSessionStatus = () => useGameStore((s) => s.session.status);
@@ -107,14 +107,11 @@ export const useSelectedGameMode = () => useGameStore((s) => s.session.gameModeI
 export const usePlayers = () => useGameStore((s) => s.session.players);
 export const useCurrentQuestionIndex = () => useGameStore((s) => s.session.currentQuestionIndex);
 
-/** Hook exposing only the action setters (stable identity, zero re-renders on state change). */
-export const useGameActions = () =>
-  useGameStore((s) => ({
-    setVibe: s.setVibe,
-    setGameMode: s.setGameMode,
-    setPlayers: s.setPlayers,
-    addPlayer: s.addPlayer,
-    removePlayer: s.removePlayer,
-    setSessionStatus: s.setSessionStatus,
-    resetSession: s.resetSession,
-  }));
+// Individual action hooks with 100% stable references
+export const useSetVibe = () => useGameStore((s) => s.setVibe);
+export const useSetGameMode = () => useGameStore((s) => s.setGameMode);
+export const useSetPlayers = () => useGameStore((s) => s.setPlayers);
+export const useAddPlayer = () => useGameStore((s) => s.addPlayer);
+export const useRemovePlayer = () => useGameStore((s) => s.removePlayer);
+export const useSetSessionStatus = () => useGameStore((s) => s.setSessionStatus);
+export const useResetSession = () => useGameStore((s) => s.resetSession);

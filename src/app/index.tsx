@@ -1,98 +1,113 @@
-import * as Device from 'expo-device';
-import { Platform, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
+import React from 'react';
+import { StyleSheet, View } from 'react-native';
+import Animated, { FadeIn } from 'react-native-reanimated';
 
-import { AnimatedIcon } from '@/components/animated-icon';
-import { HintRow } from '@/components/hint-row';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { WebBadge } from '@/components/web-badge';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { AppButton } from '@/components/ui/AppButton';
+import { AppText } from '@/components/ui/AppText';
+import { Badge } from '@/components/ui/Badge';
+import { ScreenContainer } from '@/components/ui/ScreenContainer';
+import { theme } from '@/theme';
 
-function getDevMenuHint() {
-  if (Platform.OS === 'web') {
-    return <ThemedText type="small">use browser devtools</ThemedText>;
-  }
-  if (Device.isDevice) {
-    return (
-      <ThemedText type="small">
-        shake device or press <ThemedText type="code">m</ThemedText> in terminal
-      </ThemedText>
-    );
-  }
-  const shortcut = Platform.OS === 'android' ? 'cmd+m (or ctrl+m)' : 'cmd+d';
+export default function WelcomeScreen() {
+  const router = useRouter();
+
+  const handleStart = () => {
+    router.push('/vibes');
+  };
+
   return (
-    <ThemedText type="small">
-      press <ThemedText type="code">{shortcut}</ThemedText>
-    </ThemedText>
-  );
-}
+    <ScreenContainer contentStyle={styles.container}>
+      {/* Top Header Badge */}
+      <Animated.View entering={FadeIn.duration(500)} style={styles.topSection}>
+        <Badge label="PARTY GAME" color={theme.colors.accentMuted} textColor={theme.colors.accent} />
+      </Animated.View>
 
-export default function HomeScreen() {
-  return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ThemedView style={styles.heroSection}>
-          <AnimatedIcon />
-          <ThemedText type="title" style={styles.title}>
-            Welcome to&nbsp;Expo
-          </ThemedText>
-        </ThemedView>
+      {/* Hero Brand & Taglines */}
+      <View style={styles.heroSection}>
+        <Animated.View entering={FadeIn.duration(600)}>
+          <AppText variant="display" style={styles.title}>
+            TONIGHT
+          </AppText>
+        </Animated.View>
 
-        <ThemedText type="code" style={styles.code}>
-          get started
-        </ThemedText>
+        <Animated.View entering={FadeIn.duration(700)} style={styles.taglineContainer}>
+          <AppText variant="subheading" style={styles.taglineWhite}>
+            You bring the people.
+          </AppText>
+          <AppText variant="subheading" color="accent" style={styles.taglineAccent}>
+            We bring the chaos.
+          </AppText>
+        </Animated.View>
 
-        <ThemedView type="backgroundElement" style={styles.stepContainer}>
-          <HintRow
-            title="Try editing"
-            hint={<ThemedText type="code">src/app/index.tsx</ThemedText>}
-          />
-          <HintRow title="Dev tools" hint={getDevMenuHint()} />
-          <HintRow
-            title="Fresh start"
-            hint={<ThemedText type="code">npm run reset-project</ThemedText>}
-          />
-        </ThemedView>
+        <Animated.View entering={FadeIn.duration(800)}>
+          <AppText variant="body" color="secondary" style={styles.supportingText}>
+            Your night starts here.
+          </AppText>
+        </Animated.View>
+      </View>
 
-        {Platform.OS === 'web' && <WebBadge />}
-      </SafeAreaView>
-    </ThemedView>
+      {/* Bottom CTA Button */}
+      <Animated.View entering={FadeIn.duration(600)} style={styles.bottomSection}>
+        <AppButton
+          size="lg"
+          fullWidth
+          onPress={handleStart}
+          style={styles.startButton}
+        >
+          START
+        </AppButton>
+      </Animated.View>
+    </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    justifyContent: 'center',
-    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: theme.spacing.lg,
   },
-  safeArea: {
-    flex: 1,
-    paddingHorizontal: Spacing.four,
+  topSection: {
     alignItems: 'center',
-    gap: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.three,
-    maxWidth: MaxContentWidth,
+    paddingTop: theme.spacing.sm,
   },
   heroSection: {
-    alignItems: 'center',
-    justifyContent: 'center',
     flex: 1,
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.four,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: theme.spacing.md,
   },
   title: {
+    fontSize: 56,
+    lineHeight: 60,
+    letterSpacing: -2,
+    color: theme.colors.text.primary,
     textAlign: 'center',
   },
-  code: {
-    textTransform: 'uppercase',
+  taglineContainer: {
+    alignItems: 'center',
+    gap: 4,
+    marginTop: theme.spacing.xs,
   },
-  stepContainer: {
-    gap: Spacing.three,
-    alignSelf: 'stretch',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.four,
-    borderRadius: Spacing.four,
+  taglineWhite: {
+    color: theme.colors.text.primary,
+    textAlign: 'center',
+    fontWeight: theme.typography.weight.bold,
+  },
+  taglineAccent: {
+    color: theme.colors.accent,
+    textAlign: 'center',
+    fontWeight: theme.typography.weight.extrabold,
+  },
+  supportingText: {
+    textAlign: 'center',
+    marginTop: theme.spacing.xs,
+  },
+  bottomSection: {
+    paddingBottom: theme.spacing.sm,
+  },
+  startButton: {
+    borderRadius: theme.radius.xl,
+    ...theme.shadow.glow,
   },
 });

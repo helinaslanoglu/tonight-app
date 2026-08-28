@@ -1,10 +1,16 @@
 export {
+  useAddPlayer,
   useCurrentQuestionIndex,
-  useGameActions,
   useGameSession,
   useGameStore,
   usePlayers,
+  useRemovePlayer,
+  useResetSession,
   useSelectedGameMode,
   useSelectedVibe,
   useSessionStatus,
+  useSetGameMode,
+  useSetPlayers,
+  useSetSessionStatus,
+  useSetVibe,
 } from './game-store';
