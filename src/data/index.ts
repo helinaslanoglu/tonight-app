@@ -1,4 +1,5 @@
-import type { GameMode, GameModeId, Question, Vibe, VibeId } from '@/types';
+import { generatePersonalizedQuestions } from '@/services/ai-service';
+import type { GameMode, GameModeId, Player, Question, Vibe, VibeId } from '@/types';
 
 import { GAME_MODES } from './game-modes';
 import { QUESTIONS } from './questions';
@@ -9,21 +10,17 @@ export { QUESTIONS } from './questions';
 export { VIBES } from './vibes';
 
 /**
- * Data Access Layer (Boundary Contract)
- * ──────────────────────────────────────
- * Decouples the UI and game engine from the underlying content source.
- * In future milestones, this layer can seamlessly fetch from:
- *   - Local JSON / bundle assets
- *   - Remote REST / GraphQL CMS API
- *   - AI generation service
- *   - Offline synced database
- *
- * Calling code always interacts via this interface.
+ * Data Access Layer (Hybrid Content Provider)
+ * ───────────────────────────────────────────
+ * Decouples the UI and game engine from content sources.
+ * Combines high-quality curated static questions with dynamic,
+ * background-synthesized AI questions referencing the active players.
  */
 
 export interface ContentFilter {
   vibeId?: VibeId;
   gameModeId?: GameModeId;
+  players?: Player[];
   limit?: number;
 }
 
@@ -31,10 +28,15 @@ export interface ContentProvider {
   getVibes: () => Promise<Vibe[]>;
   getGameModes: () => Promise<GameMode[]>;
   getQuestions: (filter?: ContentFilter) => Promise<Question[]>;
+  getPersonalizedQuestions: (params: {
+    vibeId: VibeId;
+    players: Player[];
+    count?: number;
+  }) => Promise<Question[]>;
 }
 
 /**
- * Default local content provider.
+ * Hybrid content provider combining instant static questions with AI personalization.
  */
 export const defaultContentProvider: ContentProvider = {
   getVibes: async (): Promise<Vibe[]> => {
@@ -62,9 +64,13 @@ export const defaultContentProvider: ContentProvider = {
 
     return result;
   },
+
+  getPersonalizedQuestions: async ({ vibeId, players, count = 6 }) => {
+    return generatePersonalizedQuestions({ vibeId, players, count });
+  },
 };
 
-// ─── Direct helper exports for convenience ────────────────────────────────────
+// ─── Helper Exports ───────────────────────────────────────────────────────────
 
 export async function fetchVibes(): Promise<Vibe[]> {
   return defaultContentProvider.getVibes();
@@ -76,4 +82,12 @@ export async function fetchGameModes(): Promise<GameMode[]> {
 
 export async function fetchQuestions(filter?: ContentFilter): Promise<Question[]> {
   return defaultContentProvider.getQuestions(filter);
+}
+
+export async function fetchPersonalizedQuestions(params: {
+  vibeId: VibeId;
+  players: Player[];
+  count?: number;
+}): Promise<Question[]> {
+  return defaultContentProvider.getPersonalizedQuestions(params);
 }

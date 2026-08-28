@@ -11,6 +11,7 @@ import type {
   GameModeId,
   GameSession,
   Player,
+  Question,
   RoundAnswer,
   SessionStatus,
   VibeId,
@@ -35,6 +36,7 @@ const INITIAL_SESSION: GameSession = {
 
 interface GameState {
   session: GameSession;
+  questionPool: Question[];
 }
 
 interface GameActions {
@@ -67,6 +69,7 @@ interface GameActions {
 
 export const useGameStore = create<GameState & GameActions>((set, get) => ({
   session: INITIAL_SESSION,
+  questionPool: [],
 
   setVibe: (vibeId) =>
     set((state) => ({
@@ -94,19 +97,36 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       return;
     }
 
-    const questionPool = await defaultContentProvider.getQuestions();
+    // 1. Instant launch with static curated questions
+    const staticQuestions = await defaultContentProvider.getQuestions();
     const newSession = startNewSession({
       vibeId: session.vibeId,
       players: session.players,
       totalRounds: session.totalRounds || DEFAULT_TOTAL_ROUNDS,
-      questionPool,
+      questionPool: staticQuestions,
     });
 
-    set({ session: newSession });
+    set({ session: newSession, questionPool: staticQuestions });
+
+    // 2. Asynchronous background AI question synthesis (adds personalized questions)
+    const vibeId = session.vibeId;
+    const players = session.players;
+    defaultContentProvider
+      .getPersonalizedQuestions({ vibeId, players, count: 8 })
+      .then((aiQuestions) => {
+        if (aiQuestions.length > 0) {
+          set((state) => ({
+            questionPool: [...state.questionPool, ...aiQuestions],
+          }));
+        }
+      })
+      .catch(() => {
+        // Silent fallback: static pool continues without interruption
+      });
   },
 
   submitAnswerAndAdvance: async (partialAnswer) => {
-    const { session } = get();
+    const { session, questionPool } = get();
     if (session.status !== 'playing' || !session.currentQuestion) {
       return;
     }
@@ -120,8 +140,8 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       timestamp: Date.now(),
     };
 
-    const questionPool = await defaultContentProvider.getQuestions();
-    const advancedSession = advanceSessionRound(session, answer, questionPool);
+    const pool = questionPool.length > 0 ? questionPool : await defaultContentProvider.getQuestions();
+    const advancedSession = advanceSessionRound(session, answer, pool);
 
     set({ session: advancedSession });
   },
@@ -132,14 +152,28 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       return;
     }
 
-    const questionPool = await defaultContentProvider.getQuestions();
-    const replayedSession = replaySession(session, questionPool);
+    const staticQuestions = await defaultContentProvider.getQuestions();
+    const replayedSession = replaySession(session, staticQuestions);
 
-    set({ session: replayedSession });
+    set({ session: replayedSession, questionPool: staticQuestions });
+
+    // Background prefetch for new replay session
+    const vibeId = session.vibeId;
+    const players = session.players;
+    defaultContentProvider
+      .getPersonalizedQuestions({ vibeId, players, count: 8 })
+      .then((aiQuestions) => {
+        if (aiQuestions.length > 0) {
+          set((state) => ({
+            questionPool: [...state.questionPool, ...aiQuestions],
+          }));
+        }
+      })
+      .catch(() => {});
   },
 
   resetSession: () =>
-    set({ session: { ...INITIAL_SESSION } }),
+    set({ session: { ...INITIAL_SESSION }, questionPool: [] }),
 }));
 
 // ─── Atomic Selector Hooks (100% stable references) ───────────────────────────
