@@ -1,45 +1,23 @@
 import { create } from 'zustand';
 
+import { defaultContentProvider } from '@/data';
+import {
+  advanceSessionRound,
+  DEFAULT_TOTAL_ROUNDS,
+  replaySession,
+  startNewSession,
+} from '@/engine';
 import type {
   GameModeId,
   GameSession,
   Player,
+  Question,
+  RoundAnswer,
   SessionStatus,
   VibeId,
 } from '@/types';
 
-// ─── State shape ──────────────────────────────────────────────────────────────
-
-interface GameState {
-  session: GameSession;
-}
-
-// ─── Actions ──────────────────────────────────────────────────────────────────
-
-interface GameActions {
-  /** Set the chosen vibe before starting a session. */
-  setVibe: (vibeId: VibeId) => void;
-
-  /** Set the chosen game mode. */
-  setGameMode: (gameModeId: GameModeId) => void;
-
-  /** Replace the full player list. */
-  setPlayers: (players: Player[]) => void;
-
-  /** Add a single player to the current list. */
-  addPlayer: (player: Player) => void;
-
-  /** Remove a player by id. */
-  removePlayer: (playerId: string) => void;
-
-  /** Transition the session lifecycle status. */
-  setSessionStatus: (status: SessionStatus) => void;
-
-  /** Reset the session to its initial idle state. */
-  resetSession: () => void;
-}
-
-// ─── Initial state ────────────────────────────────────────────────────────────
+// ─── Initial State ────────────────────────────────────────────────────────────
 
 const INITIAL_SESSION: GameSession = {
   id: null,
@@ -47,24 +25,53 @@ const INITIAL_SESSION: GameSession = {
   vibeId: null,
   gameModeId: null,
   players: [],
-  currentQuestionIndex: 0,
+  currentRound: 0,
+  totalRounds: DEFAULT_TOTAL_ROUNDS,
+  currentQuestion: null,
+  usedQuestionIds: [],
+  answers: [],
 };
 
-// ─── Store ────────────────────────────────────────────────────────────────────
+// ─── Store Interface ──────────────────────────────────────────────────────────
 
-export const useGameStore = create<GameState & GameActions>((set) => ({
-  // ── State ──────────────────────────────────────────────────────────────────
+interface GameState {
+  session: GameSession;
+}
+
+interface GameActions {
+  /** Set the chosen vibe before starting a session */
+  setVibe: (vibeId: VibeId) => void;
+
+  /** Replace the full player roster */
+  setPlayers: (players: Player[]) => void;
+
+  /** Set game mode */
+  setGameMode: (gameModeId: GameModeId) => void;
+
+  /** Transition session status */
+  setSessionStatus: (status: SessionStatus) => void;
+
+  /** Starts the game loop: initializes session, loads questions, sets round 1 */
+  startGame: () => Promise<void>;
+
+  /** Submits an answer for the current round and advances to the next question */
+  submitAnswerAndAdvance: (partialAnswer?: Partial<RoundAnswer>) => Promise<void>;
+
+  /** Replays the game with the same vibe and players */
+  replayGame: () => Promise<void>;
+
+  /** Resets session to initial idle state */
+  resetSession: () => void;
+}
+
+// ─── Store Definition ─────────────────────────────────────────────────────────
+
+export const useGameStore = create<GameState & GameActions>((set, get) => ({
   session: INITIAL_SESSION,
 
-  // ── Actions ────────────────────────────────────────────────────────────────
   setVibe: (vibeId) =>
     set((state) => ({
       session: { ...state.session, vibeId },
-    })),
-
-  setGameMode: (gameModeId) =>
-    set((state) => ({
-      session: { ...state.session, gameModeId },
     })),
 
   setPlayers: (players) =>
@@ -72,20 +79,9 @@ export const useGameStore = create<GameState & GameActions>((set) => ({
       session: { ...state.session, players },
     })),
 
-  addPlayer: (player) =>
+  setGameMode: (gameModeId) =>
     set((state) => ({
-      session: {
-        ...state.session,
-        players: [...state.session.players, player],
-      },
-    })),
-
-  removePlayer: (playerId) =>
-    set((state) => ({
-      session: {
-        ...state.session,
-        players: state.session.players.filter((p) => p.id !== playerId),
-      },
+      session: { ...state.session, gameModeId },
     })),
 
   setSessionStatus: (status) =>
@@ -93,25 +89,75 @@ export const useGameStore = create<GameState & GameActions>((set) => ({
       session: { ...state.session, status },
     })),
 
+  startGame: async () => {
+    const { session } = get();
+    if (!session.vibeId || session.players.length < 2) {
+      return;
+    }
+
+    const questionPool = await defaultContentProvider.getQuestions();
+    const newSession = startNewSession({
+      vibeId: session.vibeId,
+      players: session.players,
+      totalRounds: session.totalRounds || DEFAULT_TOTAL_ROUNDS,
+      questionPool,
+    });
+
+    set({ session: newSession });
+  },
+
+  submitAnswerAndAdvance: async (partialAnswer) => {
+    const { session } = get();
+    if (session.status !== 'playing' || !session.currentQuestion) {
+      return;
+    }
+
+    const answer: RoundAnswer = {
+      round: session.currentRound,
+      questionId: session.currentQuestion.id,
+      gameModeId: session.currentQuestion.gameModeId,
+      selectedPlayerId: partialAnswer?.selectedPlayerId,
+      selectedOption: partialAnswer?.selectedOption,
+      timestamp: Date.now(),
+    };
+
+    const questionPool = await defaultContentProvider.getQuestions();
+    const advancedSession = advanceSessionRound(session, answer, questionPool);
+
+    set({ session: advancedSession });
+  },
+
+  replayGame: async () => {
+    const { session } = get();
+    if (!session.vibeId || session.players.length < 2) {
+      return;
+    }
+
+    const questionPool = await defaultContentProvider.getQuestions();
+    const replayedSession = replaySession(session, questionPool);
+
+    set({ session: replayedSession });
+  },
+
   resetSession: () =>
-    set({ session: { ...INITIAL_SESSION, id: null } }),
+    set({ session: { ...INITIAL_SESSION } }),
 }));
 
-// ─── Atomic Selector Hooks (Performance Optimized) ───────────────────────────
-// Fine-grained selectors return primitive/stable references to prevent re-renders.
+// ─── Atomic Selector Hooks (100% stable references) ───────────────────────────
 
 export const useGameSession = () => useGameStore((s) => s.session);
 export const useSessionStatus = () => useGameStore((s) => s.session.status);
 export const useSelectedVibe = () => useGameStore((s) => s.session.vibeId);
-export const useSelectedGameMode = () => useGameStore((s) => s.session.gameModeId);
 export const usePlayers = () => useGameStore((s) => s.session.players);
-export const useCurrentQuestionIndex = () => useGameStore((s) => s.session.currentQuestionIndex);
+export const useCurrentRound = () => useGameStore((s) => s.session.currentRound);
+export const useTotalRounds = () => useGameStore((s) => s.session.totalRounds);
+export const useCurrentQuestion = () => useGameStore((s) => s.session.currentQuestion);
+export const useIsGameCompleted = () => useGameStore((s) => s.session.status === 'completed');
 
-// Individual action hooks with 100% stable references
+// Action hooks with stable references
 export const useSetVibe = () => useGameStore((s) => s.setVibe);
-export const useSetGameMode = () => useGameStore((s) => s.setGameMode);
 export const useSetPlayers = () => useGameStore((s) => s.setPlayers);
-export const useAddPlayer = () => useGameStore((s) => s.addPlayer);
-export const useRemovePlayer = () => useGameStore((s) => s.removePlayer);
-export const useSetSessionStatus = () => useGameStore((s) => s.setSessionStatus);
+export const useStartGame = () => useGameStore((s) => s.startGame);
+export const useAnswerAndAdvance = () => useGameStore((s) => s.submitAnswerAndAdvance);
+export const useReplayGame = () => useGameStore((s) => s.replayGame);
 export const useResetSession = () => useGameStore((s) => s.resetSession);

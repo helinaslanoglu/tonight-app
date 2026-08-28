@@ -1,7 +1,6 @@
 /**
  * Core domain types for the Tonight app.
- * Milestone 1: minimal type definitions only.
- * Game logic, question content, and scoring are NOT implemented yet.
+ * Strongly typed models for Vibes, Players, Game Modes, Questions, and Sessions.
  */
 
 // ─── Vibe ─────────────────────────────────────────────────────────────────────
@@ -27,42 +26,72 @@ export interface Vibe {
 export interface Player {
   id: string;
   name: string;
-  /** Optional avatar color for placeholder UI */
+  /** Avatar accent color (hex) */
   color?: string;
 }
 
 // ─── Game Mode ────────────────────────────────────────────────────────────────
 
-/**
- * Game mode defines the rule set used during a session.
- * Concrete modes will be added in later milestones.
- */
-export type GameModeId = 'classic' | 'truth-or-dare' | 'hot-seat' | 'rapid-fire';
+export type GameModeId =
+  | 'would-you-rather'
+  | 'most-likely-to'
+  | 'open-question'
+  | 'classic'
+  | 'truth-or-dare'
+  | 'hot-seat'
+  | 'rapid-fire';
 
 export interface GameMode {
   id: GameModeId;
   label: string;
   description: string;
-  /** Minimum number of players required */
+  emoji: string;
   minPlayers: number;
 }
 
-// ─── Question (placeholder shape only) ───────────────────────────────────────
+// ─── Question (Discriminated Union) ───────────────────────────────────────────
 
-/**
- * Minimal question shape. Content will be loaded from data layer in later milestones.
- */
-export interface Question {
+export interface BaseQuestion {
   id: string;
   text: string;
   vibeId: VibeId;
+}
+
+export interface WouldYouRatherQuestion extends BaseQuestion {
+  gameModeId: 'would-you-rather';
+  optionA: string;
+  optionB: string;
+}
+
+export interface MostLikelyToQuestion extends BaseQuestion {
+  gameModeId: 'most-likely-to';
+}
+
+export interface OpenQuestion extends BaseQuestion {
+  gameModeId: 'open-question';
+  prompt?: string;
+}
+
+export type Question =
+  | WouldYouRatherQuestion
+  | MostLikelyToQuestion
+  | OpenQuestion;
+
+// ─── Round Answers ────────────────────────────────────────────────────────────
+
+export interface RoundAnswer {
+  round: number;
+  questionId: string;
   gameModeId: GameModeId;
+  selectedPlayerId?: string;
+  selectedOption?: 'A' | 'B';
+  timestamp: number;
 }
 
 // ─── Session ──────────────────────────────────────────────────────────────────
 
 /** Lifecycle state of a game session. */
-export type SessionStatus = 'idle' | 'setup' | 'playing' | 'finished';
+export type SessionStatus = 'idle' | 'setup' | 'playing' | 'completed';
 
 export interface GameSession {
   id: string | null;
@@ -70,7 +99,11 @@ export interface GameSession {
   vibeId: VibeId | null;
   gameModeId: GameModeId | null;
   players: Player[];
-  currentQuestionIndex: number;
+  currentRound: number;
+  totalRounds: number;
+  currentQuestion: Question | null;
+  usedQuestionIds: string[];
+  answers: RoundAnswer[];
 }
 
 // ─── Game Result / Summary ───────────────────────────────────────────────────
@@ -78,8 +111,9 @@ export interface GameSession {
 export interface GameResult {
   sessionId: string;
   vibeId: VibeId;
-  gameModeId: GameModeId;
-  totalQuestionsAnswered: number;
+  totalRounds: number;
+  roundsCompleted: number;
   playerCount: number;
-  completedAt: string; // ISO string for portability
+  players: Player[];
+  completedAt: string; // ISO timestamp
 }

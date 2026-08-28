@@ -1,100 +1,258 @@
 import { useRouter } from 'expo-router';
-import React from 'react';
-import { StyleSheet, View } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import {
+  Keyboard,
+  Pressable,
+  StyleSheet,
+  TouchableWithoutFeedback,
+  View,
+} from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
 import { AppButton } from '@/components/ui/AppButton';
-import { AppCard } from '@/components/ui/AppCard';
 import { AppText } from '@/components/ui/AppText';
+import { AppTextInput } from '@/components/ui/AppTextInput';
 import { Badge } from '@/components/ui/Badge';
 import { IconButton } from '@/components/ui/IconButton';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { VIBES } from '@/data';
-import { useSelectedVibe } from '@/store';
+import { usePlayers, useSelectedVibe, useSetPlayers, useStartGame } from '@/store';
 import { getVibeColor, theme } from '@/theme';
+import type { Player } from '@/types';
+import { generatePlayerId } from '@/utils';
 
-export default function GameSetupPlaceholderScreen() {
+const PLAYER_COUNT_OPTIONS = [2, 3, 4, 5, 6] as const;
+type PlayerCount = (typeof PLAYER_COUNT_OPTIONS)[number];
+
+const AVATAR_COLORS = [
+  '#EC4899', // Pink
+  '#8B5CF6', // Violet
+  '#3B82F6', // Blue
+  '#10B981', // Emerald
+  '#F59E0B', // Amber
+  '#EF4444', // Red
+];
+
+export default function GameSetupScreen() {
   const router = useRouter();
   const selectedVibeId = useSelectedVibe();
+  const existingPlayers = usePlayers();
+  const setPlayers = useSetPlayers();
+  const startGame = useStartGame();
+
   const activeVibe = VIBES.find((v) => v.id === selectedVibeId);
   const vibeColor = selectedVibeId ? getVibeColor(selectedVibeId) : theme.colors.accent;
 
+  // Determine initial count from existing players (defaults to 4)
+  const initialCount = (
+    existingPlayers.length >= 2 && existingPlayers.length <= 6
+      ? existingPlayers.length
+      : 4
+  ) as PlayerCount;
+
+  const [playerCount, setPlayerCount] = useState<PlayerCount>(initialCount);
+
+  // Local state for names, initialized from existing Zustand players
+  const [playerNames, setPlayerNames] = useState<string[]>(() => {
+    return Array.from({ length: 6 }, (_, i) => existingPlayers[i]?.name || '');
+  });
+
+  const [touched, setTouched] = useState<boolean[]>(() => Array(6).fill(false));
+
+  const handleNameChange = (text: string, index: number) => {
+    setPlayerNames((prev) => {
+      const updated = [...prev];
+      updated[index] = text;
+      return updated;
+    });
+  };
+
+  const handleBlur = (index: number) => {
+    setTouched((prev) => {
+      const updated = [...prev];
+      updated[index] = true;
+      return updated;
+    });
+  };
+
+  // Active slice of names based on current player count
+  const activeNames = playerNames.slice(0, playerCount);
+
+  // Validation logic
+  const validationErrors = useMemo(() => {
+    return activeNames.map((name, index) => {
+      const trimmed = name.trim();
+      if (touched[index] && trimmed.length === 0) {
+        return 'Name is required';
+      }
+      if (trimmed.length > 20) {
+        return 'Max 20 characters';
+      }
+      // Check for duplicate names
+      const duplicateCount = activeNames.filter(
+        (n) => n.trim().toLowerCase() === trimmed.toLowerCase() && trimmed.length > 0
+      ).length;
+      if (duplicateCount > 1) {
+        return 'Name must be unique';
+      }
+      return undefined;
+    });
+  }, [activeNames, touched]);
+
+  // Overall form validity
+  const isFormValid = useMemo(() => {
+    const allFilled = activeNames.every(
+      (name) => name.trim().length > 0 && name.trim().length <= 20
+    );
+    const uniqueNames =
+      new Set(activeNames.map((n) => n.trim().toLowerCase())).size === activeNames.length;
+    return allFilled && uniqueNames;
+  }, [activeNames]);
+
+  const handleStartGame = async () => {
+    if (!isFormValid) return;
+
+    // Create stable player objects with unique IDs
+    const playersToSave: Player[] = activeNames.map((name, index) => {
+      const existing = existingPlayers[index];
+      return {
+        id: existing?.id || generatePlayerId('player'),
+        name: name.trim(),
+        color: AVATAR_COLORS[index % AVATAR_COLORS.length],
+      };
+    });
+
+    setPlayers(playersToSave);
+    await startGame();
+    router.push('/game');
+  };
+
   return (
-    <ScreenContainer contentStyle={styles.container}>
-      {/* Top Nav Bar */}
-      <View style={styles.navBar}>
-        <IconButton
-          variant="surface"
-          size="sm"
-          onPress={() => router.back()}
-          accessibilityLabel="Go back to vibe selection"
-        >
-          <AppText style={styles.backArrow}>←</AppText>
-        </IconButton>
-      </View>
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+      <ScreenContainer scrollable avoidKeyboard contentStyle={styles.container}>
+        {/* Top Navigation & Vibe Badge */}
+        <View style={styles.navBar}>
+          <IconButton
+            variant="surface"
+            size="sm"
+            onPress={() => router.back()}
+            accessibilityLabel="Go back to vibe selection"
+          >
+            <AppText style={styles.backArrow}>←</AppText>
+          </IconButton>
 
-      {/* Main Placeholder Content */}
-      <View style={styles.content}>
-        <Animated.View entering={FadeIn.duration(400)} style={styles.centerBlock}>
-          <Badge label="MILESTONE 4" color={theme.colors.surfaceElevated} textColor={theme.colors.text.secondary} />
+          {activeVibe ? (
+            <Badge
+              label={`${activeVibe.emoji} ${activeVibe.label}`}
+              color={theme.colors.surfaceElevated}
+              textColor={vibeColor}
+            />
+          ) : null}
+        </View>
 
+        {/* Screen Header */}
+        <Animated.View entering={FadeIn.duration(400)} style={styles.header}>
           <AppText variant="heading" style={styles.title}>
-            Game setup coming next.
+            Who&apos;s playing?
           </AppText>
-
-          <AppText variant="body" color="secondary" style={styles.description}>
-            Players, game modes, and question decks will be configured here.
+          <AppText variant="body" color="secondary" style={styles.subtitle}>
+            Add everyone joining tonight.
           </AppText>
-
-          {/* Selected Vibe Confirmation Card */}
-          {activeVibe && (
-            <AppCard
-              variant="elevated"
-              padding="lg"
-              style={[styles.vibeSummaryCard, { borderColor: vibeColor }]}
-            >
-              <View style={styles.vibeCardRow}>
-                <AppText style={styles.vibeEmoji}>{activeVibe.emoji}</AppText>
-                <View style={styles.vibeTextGroup}>
-                  <AppText variant="overline" color="secondary">
-                    SELECTED VIBE
-                  </AppText>
-                  <AppText variant="label" style={{ color: vibeColor }}>
-                    {activeVibe.label}
-                  </AppText>
-                  <AppText variant="bodySmall" color="secondary">
-                    {activeVibe.description}
-                  </AppText>
-                </View>
-              </View>
-            </AppCard>
-          )}
         </Animated.View>
-      </View>
 
-      {/* Bottom Actions */}
-      <View style={styles.bottomArea}>
-        <AppButton
-          variant="secondary"
-          size="lg"
-          fullWidth
-          onPress={() => router.push('/vibes')}
-        >
-          CHANGE VIBE
-        </AppButton>
-      </View>
-    </ScreenContainer>
+        {/* Player Count Selector */}
+        <Animated.View entering={FadeIn.duration(450)} style={styles.countSection}>
+          <AppText variant="overline" color="secondary" style={styles.sectionLabel}>
+            NUMBER OF PLAYERS
+          </AppText>
+          <View style={styles.pillRow}>
+            {PLAYER_COUNT_OPTIONS.map((count) => {
+              const isSelected = playerCount === count;
+              return (
+                <Pressable
+                  key={count}
+                  onPress={() => setPlayerCount(count)}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: isSelected }}
+                  accessibilityLabel={`${count} players`}
+                  accessibilityHint="Selects number of players to join the game"
+                  style={[
+                    styles.countPill,
+                    isSelected ? styles.countPillSelected : styles.countPillUnselected,
+                  ]}
+                >
+                  <AppText
+                    variant="label"
+                    style={[
+                      styles.countPillText,
+                      isSelected && styles.countPillTextSelected,
+                    ]}
+                  >
+                    {count === 6 ? '6+' : count}
+                  </AppText>
+                </Pressable>
+              );
+            })}
+          </View>
+        </Animated.View>
+
+        {/* Dynamic Player Name Inputs */}
+        <View style={styles.inputsList}>
+          {Array.from({ length: playerCount }).map((_, index) => {
+            const error = validationErrors[index];
+            const playerColor = AVATAR_COLORS[index % AVATAR_COLORS.length];
+
+            return (
+              <Animated.View
+                key={index}
+                entering={FadeIn.duration(350)}
+                style={styles.inputItem}
+              >
+                <AppTextInput
+                  label={`Player ${index + 1}`}
+                  placeholder={`Enter name for Player ${index + 1}`}
+                  value={playerNames[index] || ''}
+                  onChangeText={(text) => handleNameChange(text, index)}
+                  onBlur={() => handleBlur(index)}
+                  error={error}
+                  maxLength={20}
+                  autoCapitalize="words"
+                  autoCorrect={false}
+                  returnKeyType={index === playerCount - 1 ? 'done' : 'next'}
+                  leftIcon={
+                    <View style={[styles.avatarDot, { backgroundColor: playerColor }]} />
+                  }
+                />
+              </Animated.View>
+            );
+          })}
+        </View>
+
+        {/* Bottom CTA Button */}
+        <Animated.View entering={FadeIn.duration(400)} style={styles.bottomArea}>
+          <AppButton
+            size="lg"
+            fullWidth
+            disabled={!isFormValid}
+            onPress={handleStartGame}
+            style={isFormValid ? styles.startButtonActive : undefined}
+          >
+            START GAME
+          </AppButton>
+        </Animated.View>
+      </ScreenContainer>
+    </TouchableWithoutFeedback>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    justifyContent: 'space-between',
-    paddingBottom: theme.spacing.lg,
+    paddingBottom: theme.spacing.xl,
   },
   navBar: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: theme.spacing.sm,
   },
   backArrow: {
@@ -102,44 +260,67 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     color: theme.colors.text.primary,
   },
-  content: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  centerBlock: {
-    alignItems: 'center',
-    gap: theme.spacing.md,
-    width: '100%',
+  header: {
+    marginBottom: theme.spacing.md,
   },
   title: {
-    textAlign: 'center',
     color: theme.colors.text.primary,
+    fontSize: theme.typography.size['3xl'],
   },
-  description: {
-    textAlign: 'center',
-    maxWidth: 280,
+  subtitle: {
+    marginTop: theme.spacing.xs,
   },
-  vibeSummaryCard: {
-    width: '100%',
-    marginTop: theme.spacing.md,
-    borderWidth: 1.5,
-    borderRadius: theme.radius.xl,
+  countSection: {
+    marginBottom: theme.spacing.lg,
   },
-  vibeCardRow: {
+  sectionLabel: {
+    marginBottom: theme.spacing.sm,
+  },
+  pillRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.md,
+    gap: theme.spacing.sm,
   },
-  vibeEmoji: {
-    fontSize: 36,
-    lineHeight: 42,
-  },
-  vibeTextGroup: {
+  countPill: {
     flex: 1,
-    gap: 2,
+    height: theme.touchTarget.md,
+    borderRadius: theme.radius.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+  },
+  countPillUnselected: {
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border,
+  },
+  countPillSelected: {
+    backgroundColor: theme.colors.accent,
+    borderColor: theme.colors.accent,
+    ...theme.shadow.glow,
+  },
+  countPillText: {
+    color: theme.colors.text.secondary,
+    fontWeight: theme.typography.weight.bold,
+  },
+  countPillTextSelected: {
+    color: theme.colors.accentForeground,
+  },
+  inputsList: {
+    gap: theme.spacing.md,
+    marginBottom: theme.spacing.xl,
+  },
+  inputItem: {
+    width: '100%',
+  },
+  avatarDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
   },
   bottomArea: {
-    paddingTop: theme.spacing.md,
+    marginTop: 'auto',
+    paddingTop: theme.spacing.sm,
+  },
+  startButtonActive: {
+    ...theme.shadow.glow,
   },
 });

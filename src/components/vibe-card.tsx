@@ -20,6 +20,7 @@ export function VibeCard({ vibe, selected, onSelect }: VibeCardProps) {
       accessibilityRole="radio"
       accessibilityState={{ selected }}
       accessibilityLabel={`${vibe.label} vibe. ${vibe.description}`}
+      accessibilityHint="Double tap to select this vibe for tonight"
       style={({ pressed }) => [
         styles.card,
         selected ? [styles.cardSelected, { borderColor: vibeColor }] : styles.cardUnselected,

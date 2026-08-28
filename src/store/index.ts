@@ -1,16 +1,20 @@
+/**
+ * Store barrel export.
+ */
 export {
-  useAddPlayer,
-  useCurrentQuestionIndex,
+  useAnswerAndAdvance,
+  useCurrentQuestion,
+  useCurrentRound,
   useGameSession,
   useGameStore,
+  useIsGameCompleted,
   usePlayers,
-  useRemovePlayer,
+  useReplayGame,
   useResetSession,
-  useSelectedGameMode,
   useSelectedVibe,
   useSessionStatus,
-  useSetGameMode,
   useSetPlayers,
-  useSetSessionStatus,
   useSetVibe,
+  useStartGame,
+  useTotalRounds,
 } from './game-store';
