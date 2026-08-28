@@ -11,7 +11,6 @@ import type {
   GameModeId,
   GameSession,
   Player,
-  Question,
   RoundAnswer,
   SessionStatus,
   VibeId,

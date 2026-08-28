@@ -52,9 +52,12 @@ export default function GameSetupScreen() {
 
   const [playerCount, setPlayerCount] = useState<PlayerCount>(initialCount);
 
-  // Local state for names, initialized from existing Zustand players
+  // Local state for names, initialized from existing Zustand players or friendly defaults
   const [playerNames, setPlayerNames] = useState<string[]>(() => {
-    return Array.from({ length: 6 }, (_, i) => existingPlayers[i]?.name || '');
+    if (existingPlayers.length >= 2) {
+      return Array.from({ length: 6 }, (_, i) => existingPlayers[i]?.name || '');
+    }
+    return ['Alex', 'Sam', 'Taylor', 'Jordan', '', ''];
   });
 
   const [touched, setTouched] = useState<boolean[]>(() => Array(6).fill(false));
