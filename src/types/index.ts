@@ -72,3 +72,14 @@ export interface GameSession {
   players: Player[];
   currentQuestionIndex: number;
 }
+
+// ─── Game Result / Summary ───────────────────────────────────────────────────
+
+export interface GameResult {
+  sessionId: string;
+  vibeId: VibeId;
+  gameModeId: GameModeId;
+  totalQuestionsAnswered: number;
+  playerCount: number;
+  completedAt: string; // ISO string for portability
+}

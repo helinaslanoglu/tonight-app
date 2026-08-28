@@ -1,56 +1,65 @@
-# Welcome to your Expo app 👋
+# Tonight — Mobile Social Party Game App
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A modern, fast-paced party game application built with React Native and Expo. Players get together with friends, select a vibe (Funny, Party, Date, Deep Talk, Chaos, Chill), add players, and jump into curated question decks.
 
-## Get started
+---
 
-1. Install dependencies
+## 🛠 Tech Stack
 
-   ```bash
-   npm install
-   ```
+- **Framework**: [Expo SDK 57](https://docs.expo.dev/) (React Native 0.86, React 19)
+- **Routing**: [Expo Router v57](https://docs.expo.dev/router/introduction/) (file-based navigation)
+- **Language**: TypeScript 6 (strict mode enabled)
+- **State Management**: [Zustand v5](https://zustand-demo.pmnd.rs/) with atomic selector hooks
+- **Local Persistence**: `@react-native-async-storage/async-storage` (typed storage layer)
+- **Animations**: `react-native-reanimated` v4 (worklet model, new architecture)
+- **Styling**: Centralized design token system (`src/theme/`) + React Native `StyleSheet`
 
-2. Start the app
+---
 
-   ```bash
-   npx expo start
-   ```
+## 🚀 Quick Start
 
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
+### 1. Install dependencies
 ```bash
-npm run reset-project
+npm install
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+### 2. Start the development server
+```bash
+npx expo start
+```
 
-### Other setup steps
+Press `i` in the terminal to open the **iOS Simulator**, or `a` for **Android Emulator**.
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+---
 
-## Learn more
+## 📂 Project Architecture
 
-To learn more about developing your project with Expo, look at the following resources:
+```
+tonight-app/
+├── app.json                # Expo application configuration
+├── eslint.config.js        # ESLint flat config (expo-config)
+├── package.json            # Project dependencies & scripts
+├── tsconfig.json           # Strict TypeScript configuration (@/* paths)
+│
+└── src/
+    ├── app/                # Expo Router file-based screens & layouts
+    ├── components/
+    │   └── ui/             # Reusable UI component library (AppText, AppButton, AppCard, etc.)
+    ├── data/               # Data-access abstraction layer (ContentProvider contracts)
+    ├── hooks/              # Custom reusable React hooks
+    ├── store/              # Zustand global session & state slices
+    ├── theme/              # Centralized design tokens, typography, and theme API
+    ├── types/              # Domain TypeScript types & interfaces
+    └── utils/              # Resilient storage and helper utilities
+```
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+---
 
-## Join the community
+## 🧪 Development Commands
 
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+| Command | Description |
+|---|---|
+| `npx tsc --noEmit` | Run strict TypeScript type check |
+| `npm run lint` | Run ESLint check |
+| `npx expo start --ios` | Start dev server directly in iOS Simulator |
+| `npx expo start --android` | Start dev server in Android Emulator |

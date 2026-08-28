@@ -96,3 +96,25 @@ export const useGameStore = create<GameState & GameActions>((set) => ({
   resetSession: () =>
     set({ session: { ...INITIAL_SESSION, id: null } }),
 }));
+
+// ─── Atomic Selector Hooks (Performance Optimization) ─────────────────────────
+// Using fine-grained selectors prevents full-tree re-renders when unrelated state slices change.
+
+export const useGameSession = () => useGameStore((s) => s.session);
+export const useSessionStatus = () => useGameStore((s) => s.session.status);
+export const useSelectedVibe = () => useGameStore((s) => s.session.vibeId);
+export const useSelectedGameMode = () => useGameStore((s) => s.session.gameModeId);
+export const usePlayers = () => useGameStore((s) => s.session.players);
+export const useCurrentQuestionIndex = () => useGameStore((s) => s.session.currentQuestionIndex);
+
+/** Hook exposing only the action setters (stable identity, zero re-renders on state change). */
+export const useGameActions = () =>
+  useGameStore((s) => ({
+    setVibe: s.setVibe,
+    setGameMode: s.setGameMode,
+    setPlayers: s.setPlayers,
+    addPlayer: s.addPlayer,
+    removePlayer: s.removePlayer,
+    setSessionStatus: s.setSessionStatus,
+    resetSession: s.resetSession,
+  }));
