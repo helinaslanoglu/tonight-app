@@ -18,6 +18,7 @@ export {
   useLanguage,
   usePassPhonePhase,
   usePassPhoneRounds,
+  usePassPhoneSelectedAction,
   usePassPhoneSelector,
   usePassPhoneShots,
   usePassPhoneState,

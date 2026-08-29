@@ -242,9 +242,9 @@ async function runTestSuite() {
   passedCount++;
 
   // ─── 17. Pass The Phone Translations ───────────────────────────────────────
-  assert(t('passPhone.takeShotButton', 'en') === '🥃 TAKE THE SHOT', 'en take shot');
+  assert(t('passPhone.takeShotButton', 'en') === '🥃 TAKE A SHOT (KEEP SECRET)', 'en take shot');
   assert(t('passPhone.takeShotButton', 'tr') === '🥃 SHOT AT (SIR KALSIN)', 'tr take shot');
-  assert(t('passPhone.takeShotButton', 'fr') === '🥃 BOIRE UN SHOT', 'fr take shot');
+  assert(t('passPhone.takeShotButton', 'fr') === '🥃 BOIRE UN SHOT (GARDER SECRET)', 'fr take shot');
   assert(t('passPhone.takeShotButton', 'ar') === '🥃 اشرب جرعة (احتفظ بالسر)', 'ar take shot');
   console.log('✓ 17. Pass The Phone action buttons translated across all 4 languages');
   passedCount++;

@@ -153,13 +153,16 @@ async function runPassPhoneEngineTests() {
   session = selectPassPhoneTarget(session, 'player_04');
   session = confirmPassPhoneHandover(session);
 
-  // Can takes a shot!
+  // Mert takes a shot to keep secret!
   const shotResult = commitPassPhoneAction(session, 'take-shot');
-  assert(shotResult.isRoundComplete, 'take-shot must immediately complete round');
+  assert(!shotResult.isRoundComplete, 'take-shot displays outcome screen before completing round');
+  assert(shotResult.nextSession.passPhoneState?.phase === 'REVEALING_QUESTION', 'Phase must be REVEALING_QUESTION');
   assert(shotResult.nextSession.passPhoneState?.shotsCount === 1, 'Shots count must be 1');
-  assert(shotResult.nextSession.passPhoneState?.roundHistory.length === 2, 'History must have 2 records');
-  session = shotResult.nextSession;
-  console.log('  ✅ Tests 10 & 12 Passed: TAKE_SHOT immediately completes round and increments shots count.');
+  assert(shotResult.nextSession.passPhoneState?.selectedAction === 'take-shot', 'Selected action must be take-shot');
+  session = acknowledgePassPhoneReveal(shotResult.nextSession);
+  assert(session.passPhoneState?.roundHistory.length === 2, 'History must have 2 records');
+  assert(session.passPhoneState?.roundHistory[1].action === 'take-shot', 'Recorded action must be take-shot');
+  console.log('  ✅ Tests 10 & 12 Passed: TAKE_SHOT increments shots count and records round history.');
 
   // ─── Test 13, 14, 15, 16: Multi-Round Progression & Session Completion ──────
   console.log('▶ Tests 13-16: Multi-Round Progression & Final Session Completion');
@@ -178,10 +181,11 @@ async function runPassPhoneEngineTests() {
   session = selectPassPhoneTarget(session, 'player_02');
   session = confirmPassPhoneHandover(session);
 
-  // Mert takes a shot!
+  // Ece takes a shot to keep secret!
   const finalShotResult = commitPassPhoneAction(session, 'take-shot');
-  assert(finalShotResult.isRoundComplete, 'Final action completes round');
-  session = advancePassPhoneRound(finalShotResult.nextSession, null);
+  assert(!finalShotResult.isRoundComplete, 'take-shot displays outcome screen before completing');
+  session = acknowledgePassPhoneReveal(finalShotResult.nextSession);
+  session = advancePassPhoneRound(session, null);
   assert(session.status === 'completed', 'Session must be completed after totalRounds');
   assert(session.passPhoneState?.phase === 'SESSION_COMPLETE', 'PassPhoneState phase must be SESSION_COMPLETE');
   console.log('  ✅ Tests 13-16 Passed: Clean progression through totalRounds to completion.');

@@ -36,27 +36,38 @@ export function ScreenContainer({
   const topInset = insets?.top ?? 0;
   const bottomInset = insets?.bottom ?? 0;
 
-  const innerStyle: StyleProp<ViewStyle> = [
-    styles.inner,
-    !disablePadding && styles.padded,
-    {
-      paddingTop: topInset + theme.spacing.md,
-      paddingBottom: bottomInset + theme.spacing.md,
-    },
-    contentStyle,
-  ];
-
   const content = scrollable ? (
     <ScrollView
       style={styles.scroll}
-      contentContainerStyle={[innerStyle, styles.scrollContent]}
+      contentContainerStyle={[
+        styles.scrollContent,
+        !disablePadding && styles.padded,
+        {
+          paddingTop: topInset + theme.spacing.md,
+          paddingBottom: bottomInset + theme.spacing.xl,
+        },
+        contentStyle,
+      ]}
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
+      bounces={true}
     >
       {children}
     </ScrollView>
   ) : (
-    <View style={innerStyle}>{children}</View>
+    <View
+      style={[
+        styles.inner,
+        !disablePadding && styles.padded,
+        {
+          paddingTop: topInset + theme.spacing.md,
+          paddingBottom: bottomInset + theme.spacing.md,
+        },
+        contentStyle,
+      ]}
+    >
+      {children}
+    </View>
   );
 
   if (avoidKeyboard) {

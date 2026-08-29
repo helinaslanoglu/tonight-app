@@ -574,6 +574,8 @@ export const usePassPhoneTarget = (): Player | null =>
   );
 export const usePassPhoneShots = (): number =>
   useGameStore((s) => s.session.passPhoneState?.shotsCount ?? 0);
+export const usePassPhoneSelectedAction = () =>
+  useGameStore((s) => s.session.passPhoneState?.selectedAction);
 export const usePassPhoneRounds = (): PassPhoneRoundRecord[] =>
   useGameStore((s) => s.session.passPhoneState?.roundHistory || []);
 

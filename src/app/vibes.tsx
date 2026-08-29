@@ -6,10 +6,12 @@ import Animated, { FadeIn } from 'react-native-reanimated';
 import { AppButton } from '@/components/ui/AppButton';
 import { AppText } from '@/components/ui/AppText';
 import { IconButton } from '@/components/ui/IconButton';
+import { LanguageButton } from '@/components/ui/LanguageButton';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { VibeCard } from '@/components/vibe-card';
 import { VIBES } from '@/data';
-import { useSelectedVibe, useSetVibe } from '@/store';
+import { isRTL, t } from '@/services/i18n';
+import { useLanguage, useSelectedVibe, useSetVibe } from '@/store';
 import { theme } from '@/theme';
 import type { VibeId } from '@/types';
 
@@ -17,6 +19,8 @@ export default function VibeSelectionScreen() {
   const router = useRouter();
   const selectedVibe = useSelectedVibe();
   const setVibe = useSetVibe();
+  const activeLanguage = useLanguage();
+  const rtl = isRTL(activeLanguage);
 
   const handleSelectVibe = (vibeId: VibeId) => {
     setVibe(vibeId);
@@ -30,25 +34,27 @@ export default function VibeSelectionScreen() {
 
   return (
     <ScreenContainer scrollable contentStyle={styles.container}>
-      {/* Top Navigation Bar */}
-      <View style={styles.navBar}>
+      {/* Top Navigation Bar with Back & Language Selector Buttons */}
+      <View style={[styles.navBar, rtl && styles.navBarRTL]}>
         <IconButton
           variant="surface"
           size="sm"
           onPress={() => router.back()}
           accessibilityLabel="Go back to welcome screen"
         >
-          <AppText style={styles.backArrow}>←</AppText>
+          <AppText style={styles.backArrow}>{rtl ? '→' : '←'}</AppText>
         </IconButton>
+
+        <LanguageButton />
       </View>
 
       {/* Screen Header */}
       <Animated.View entering={FadeIn.duration(400)} style={styles.header}>
-        <AppText variant="heading" style={styles.title}>
-          What&apos;s the vibe?
+        <AppText variant="heading" style={[styles.title, rtl && styles.textRTL]}>
+          {t('vibes.headerTitle', activeLanguage)}
         </AppText>
-        <AppText variant="body" color="secondary" style={styles.subtitle}>
-          Pick the mood for tonight.
+        <AppText variant="body" color="secondary" style={[styles.subtitle, rtl && styles.textRTL]}>
+          {t('vibes.headerSubtitle', activeLanguage)}
         </AppText>
       </Animated.View>
 
@@ -73,7 +79,7 @@ export default function VibeSelectionScreen() {
           onPress={handleContinue}
           style={selectedVibe ? styles.continueButtonActive : undefined}
         >
-          CONTINUE
+          {t('vibes.continueCta', activeLanguage)}
         </AppButton>
       </Animated.View>
     </ScreenContainer>
@@ -87,7 +93,11 @@ const styles = StyleSheet.create({
   navBar: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: theme.spacing.sm,
+  },
+  navBarRTL: {
+    flexDirection: 'row-reverse',
   },
   backArrow: {
     fontSize: 18,
@@ -103,6 +113,9 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     marginTop: theme.spacing.xs,
+  },
+  textRTL: {
+    textAlign: 'right',
   },
   vibeList: {
     marginBottom: theme.spacing.lg,

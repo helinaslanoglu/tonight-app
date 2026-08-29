@@ -1,10 +1,8 @@
 import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import {
-  Keyboard,
   Pressable,
   StyleSheet,
-  TouchableWithoutFeedback,
   View,
 } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
@@ -14,20 +12,20 @@ import { AppText } from '@/components/ui/AppText';
 import { AppTextInput } from '@/components/ui/AppTextInput';
 import { Badge } from '@/components/ui/Badge';
 import { IconButton } from '@/components/ui/IconButton';
+import { LanguageButton } from '@/components/ui/LanguageButton';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { VIBES } from '@/data';
-import { isRTL, LANGUAGES, t } from '@/services/i18n';
+import { isRTL, t } from '@/services/i18n';
 import {
   useLanguage,
   usePlayers,
   useSelectedVibe,
   useSessionType,
-  useSetLanguage,
   useSetPlayers,
   useSetSessionType,
 } from '@/store';
 import { getVibeColor, theme } from '@/theme';
-import type { LanguageId, Player, SessionType } from '@/types';
+import type { Player, SessionType } from '@/types';
 import { generatePlayerId, haptic } from '@/utils';
 
 const PLAYER_COUNT_OPTIONS = [2, 3, 4, 5, 6] as const;
@@ -50,7 +48,6 @@ export default function GameSetupScreen() {
   const existingPlayers = usePlayers();
   const setPlayers = useSetPlayers();
   const setSessionType = useSetSessionType();
-  const setLanguage = useSetLanguage();
 
   const [sessionType, setLocalSessionType] = useState<SessionType>(
     currentSessionType || 'group'
@@ -148,10 +145,10 @@ export default function GameSetupScreen() {
   };
 
   return (
-    <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-      <ScreenContainer scrollable avoidKeyboard contentStyle={styles.container}>
-        {/* Top Navigation & Vibe Badge */}
-        <View style={[styles.navBar, rtl && styles.navBarRTL]}>
+    <ScreenContainer scrollable avoidKeyboard contentStyle={styles.container}>
+      {/* Top Navigation Bar: Back Button, Circular Language Selector, Vibe Badge */}
+      <View style={[styles.navBar, rtl && styles.navBarRTL]}>
+        <View style={[styles.navLeftGroup, rtl && styles.rowRTL]}>
           <IconButton
             variant="surface"
             size="sm"
@@ -161,14 +158,17 @@ export default function GameSetupScreen() {
             <AppText style={styles.backArrow}>{rtl ? '→' : '←'}</AppText>
           </IconButton>
 
-          {activeVibe ? (
-            <Badge
-              label={`${activeVibe.emoji} ${activeVibe.label}`}
-              color={theme.colors.surfaceElevated}
-              textColor={vibeColor}
-            />
-          ) : null}
+          <LanguageButton />
         </View>
+
+        {activeVibe ? (
+          <Badge
+            label={`${activeVibe.emoji} ${activeVibe.label}`}
+            color={theme.colors.surfaceElevated}
+            textColor={vibeColor}
+          />
+        ) : null}
+      </View>
 
         {/* Screen Header */}
         <Animated.View entering={FadeIn.duration(400)} style={styles.header}>
@@ -185,52 +185,6 @@ export default function GameSetupScreen() {
           >
             {t('setup.headerSubtitle', activeLanguage)}
           </AppText>
-        </Animated.View>
-
-        {/* Language Selector Section */}
-        <Animated.View entering={FadeIn.duration(410)} style={styles.section}>
-          <AppText
-            variant="overline"
-            color="secondary"
-            style={[styles.sectionLabel, rtl && styles.textRTL]}
-          >
-            {t('setup.languageLabel', activeLanguage)}
-          </AppText>
-          <View style={[styles.languageGrid, rtl && styles.rowRTL]}>
-            {LANGUAGES.map((lang) => {
-              const isSelected = activeLanguage === lang.id;
-              return (
-                <Pressable
-                  key={lang.id}
-                  onPress={() => {
-                    haptic.selection().catch(() => {});
-                    setLanguage(lang.id as LanguageId);
-                  }}
-                  accessibilityRole="radio"
-                  accessibilityState={{ selected: isSelected }}
-                  accessibilityLabel={`${lang.label} (${lang.nativeLabel})`}
-                  style={({ pressed }) => [
-                    styles.languagePill,
-                    isSelected
-                      ? [styles.languagePillSelected, { borderColor: vibeColor }]
-                      : styles.languagePillUnselected,
-                    pressed && styles.cardPressed,
-                  ]}
-                >
-                  <AppText style={styles.flagEmoji}>{lang.flag}</AppText>
-                  <AppText
-                    variant="label"
-                    style={[
-                      styles.languagePillText,
-                      isSelected && { color: vibeColor, fontWeight: '700' },
-                    ]}
-                  >
-                    {lang.nativeLabel}
-                  </AppText>
-                </Pressable>
-              );
-            })}
-          </View>
         </Animated.View>
 
         {/* Session Type Switcher */}
@@ -467,7 +421,6 @@ export default function GameSetupScreen() {
           </AppButton>
         </View>
       </ScreenContainer>
-    </TouchableWithoutFeedback>
   );
 }
 
@@ -484,6 +437,11 @@ const styles = StyleSheet.create({
   navBarRTL: {
     flexDirection: 'row-reverse',
   },
+  navLeftGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+  },
   backArrow: {
     fontSize: theme.typography.size.md,
     color: theme.colors.text.primary,
@@ -499,48 +457,13 @@ const styles = StyleSheet.create({
   },
   textRTL: {
     textAlign: 'right',
-    writingDirection: 'rtl',
   },
   rowRTL: {
     flexDirection: 'row-reverse',
   },
-  section: {
-    marginBottom: theme.spacing.lg,
-  },
   sectionLabel: {
     marginBottom: theme.spacing.sm,
     letterSpacing: 1.5,
-  },
-  languageGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: theme.spacing.sm,
-  },
-  languagePill: {
-    flex: 1,
-    minWidth: '45%',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.md,
-    borderRadius: theme.radius.md,
-    borderWidth: 1.5,
-    gap: theme.spacing.xs,
-  },
-  languagePillSelected: {
-    backgroundColor: theme.colors.surfaceElevated,
-  },
-  languagePillUnselected: {
-    backgroundColor: theme.colors.surface,
-    borderColor: theme.colors.border,
-  },
-  flagEmoji: {
-    fontSize: 16,
-  },
-  languagePillText: {
-    fontSize: theme.typography.size.sm,
-    color: theme.colors.text.primary,
   },
   sessionTypeSection: {
     marginBottom: theme.spacing.lg,

@@ -44,6 +44,7 @@ import {
   useIsGameCompleted,
   useLanguage,
   usePassPhonePhase,
+  usePassPhoneSelectedAction,
   usePassPhoneSelector,
   usePassPhoneTarget,
   usePlayers,
@@ -86,6 +87,7 @@ export default function GameScreen() {
   const passPhonePhase = usePassPhonePhase();
   const passPhoneSelector = usePassPhoneSelector();
   const passPhoneTarget = usePassPhoneTarget();
+  const passPhoneSelectedAction = usePassPhoneSelectedAction();
 
   // Actions
   const answerAndAdvance = useAnswerAndAdvance();
@@ -847,16 +849,16 @@ export default function GameScreen() {
           </Animated.View>
         )}
 
-        {/* Phase 3: TARGET_ACTION */}
+        {/* Phase 3: TARGET_ACTION (Selector's Dilemma) */}
         {passPhonePhase === 'TARGET_ACTION' && passPhoneTarget && (
           <Animated.View entering={FadeIn.duration(300)} style={styles.passPhoneMiddlePhase}>
             <View style={styles.passPhoneCard}>
-              <AppText style={styles.hugeEmoji}>👀</AppText>
+              <AppText style={styles.hugeEmoji}>🥃</AppText>
               <AppText variant="display" style={[styles.passPhoneTitle, rtl && styles.textRTL]}>
                 {t('passPhone.actionTitle', language)}
               </AppText>
               <AppText variant="body" color="secondary" style={[styles.passPhoneSubtext, rtl && styles.textRTL]}>
-                {t('passPhone.actionSubtitle', language)}
+                {t('passPhone.actionSubtitle', language, { target: passPhoneTarget.name })}
               </AppText>
 
               <View style={styles.actionButtons}>
@@ -889,29 +891,48 @@ export default function GameScreen() {
           </Animated.View>
         )}
 
-        {/* Phase 4: REVEALING_QUESTION */}
+        {/* Phase 4: REVEALING_QUESTION or CONCEALED SHOT */}
         {passPhonePhase === 'REVEALING_QUESTION' && (
           <Animated.View entering={FadeIn.duration(300)} style={styles.passPhoneContainer}>
-            <Badge
-              label={t('passPhone.questionWasBadge', language)}
-              color={theme.colors.accentMuted}
-              textColor={theme.colors.accent}
-            />
+            {passPhoneSelectedAction === 'take-shot' ? (
+              <View style={styles.passPhoneMiddlePhase}>
+                <View style={styles.passPhoneCard}>
+                  <AppText style={styles.hugeEmoji}>🥃</AppText>
+                  <AppText variant="display" style={[styles.passPhoneTitle, rtl && styles.textRTL]}>
+                    {t('passPhone.shotTakenCardTitle', language)}
+                  </AppText>
+                  <AppText variant="body" color="secondary" style={[styles.passPhoneSubtext, rtl && styles.textRTL]}>
+                    {t('passPhone.shotTakenCardSubtitle', language, {
+                      selector: passPhoneSelector.name,
+                      target: passPhoneTarget?.name || '',
+                    })}
+                  </AppText>
+                </View>
+              </View>
+            ) : (
+              <>
+                <Badge
+                  label={t('passPhone.questionWasBadge', language)}
+                  color={theme.colors.accentMuted}
+                  textColor={theme.colors.accent}
+                />
 
-            <AppCard variant="elevated" padding="xl" glow style={[styles.questionCard, { marginTop: theme.spacing.md }]}>
-              <AppText variant="heading" style={[styles.questionText, rtl && styles.textRTL]}>
-                &ldquo;{currentQuestion?.text}&rdquo;
-              </AppText>
-            </AppCard>
+                <AppCard variant="elevated" padding="xl" glow style={[styles.questionCard, { marginTop: theme.spacing.md }]}>
+                  <AppText variant="heading" style={[styles.questionText, rtl && styles.textRTL]}>
+                    &ldquo;{currentQuestion?.text}&rdquo;
+                  </AppText>
+                </AppCard>
 
-            <AppCard variant="default" padding="lg" style={styles.selectorRevealCard}>
-              <AppText variant="body" style={[styles.selectorRevealText, rtl && styles.textRTL]}>
-                {t('passPhone.selectorRevealed', language, {
-                  selector: passPhoneSelector.name,
-                  target: passPhoneTarget?.name || '',
-                })}
-              </AppText>
-            </AppCard>
+                <AppCard variant="default" padding="lg" style={styles.selectorRevealCard}>
+                  <AppText variant="body" style={[styles.selectorRevealText, rtl && styles.textRTL]}>
+                    {t('passPhone.selectorRevealed', language, {
+                      selector: passPhoneSelector.name,
+                      target: passPhoneTarget?.name || '',
+                    })}
+                  </AppText>
+                </AppCard>
+              </>
+            )}
 
             <View style={styles.bottomArea}>
               <AppButton

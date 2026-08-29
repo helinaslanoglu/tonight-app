@@ -1,115 +1,47 @@
-# Milestone 8.5 — Multi-Language Content Architecture Walkthrough
+# UI & Gameplay Refinement Walkthrough
 
 ## Summary
 
-In Milestone 8.5, we implemented a robust, modular, production-ready **Multi-Language Content Architecture** for the Tonight app. This architecture seamlessly supports:
-1. 🇬🇧 **English (`en`)**
-2. 🇹🇷 **Türkçe (`tr`)**
-3. 🇫🇷 **Français (`fr`)**
-4. 🇸🇦 **العربية (`ar`)** (with full right-to-left RTL support)
-
-The architecture is built on strict design invariants: **stable canonical question IDs**, **pure translation resolver with deterministic English fallback**, **offline-first curated catalogs**, **multi-lingual AI question synthesis with raw player name preservation**, and **zero coupling to external backend services or databases**.
-
----
-
-## Key Changes & Architecture
-
-### 1. Pure Translation & Localization Subsystem (`src/services/i18n/`)
-- **Metadata & Direction Helpers** (`languages.ts`, `direction.ts`):
-  - Strongly typed `LanguageId = 'en' | 'tr' | 'fr' | 'ar'`.
-  - Pure direction utilities: `isRTL(language)`, `getTextDirection(language)`, `getTextAlign(language, defaultAlign)`.
-- **Translation Dictionaries & Engine** (`i18n.ts`, `translations/*.ts`):
-  - Type-safe `TranslationKey` mappings covering Navigation, Game Setup, Session Types, Game Modes, Group Session, Pass The Phone, and Results.
-  - Parameter interpolation (`{name}`, `{count}`, `{target}`, `{rounds}`) for rich dynamic strings.
-  - Deterministic fallback to English when keys are missing in target languages.
-
-### 2. Localized Question Catalogs (`src/data/questions/`)
-- **100% Canonical ID Parity Across 4 Languages**:
-  - `src/data/questions/en.ts` (60 questions across 5 game modes & 6 vibes)
-  - `src/data/questions/tr.ts` (60 matching questions with identical IDs)
-  - `src/data/questions/fr.ts` (60 matching questions with identical IDs)
-  - `src/data/questions/ar.ts` (60 matching questions with identical IDs & Arabic script)
-- **Cross-Session Deduplication**:
-  - `getQuestionIdentity(q)` maps curated questions to their canonical ID regardless of language.
-  - If a group plays a question in English in session 1 and switches to Turkish in session 2, the question is recognized as seen and avoided.
-
-### 3. Multi-Language AI Generation & Script Validation (`src/services/ai/`)
-- **AI Request Contract**: `AIGenerationParams` accepts `language?: LanguageId`.
-- **Local Synthesizer Provider**:
-  - Supports localized templates for English, Turkish, French, and Arabic.
-  - **Critical Invariant**: Player names (`Alex`, `Helin`, `Mert`) are preserved raw and embedded without translation or distortion.
-- **Language Script Validation (`validator.ts`)**:
-  - `validateLanguageScript(text, expectedLanguage)` validates Arabic Unicode script presence for `ar` and absence for Latin languages (`en`, `tr`, `fr`).
-
-### 4. Game Setup & Gameplay Screen Integration
-- **Game Setup Screen (`src/app/game-setup.tsx`)**:
-  - Added 4-language pill selector (`🇬🇧 English`, `🇹🇷 Türkçe`, `🇫🇷 Français`, `🇸🇦 العربية`).
-  - Active language choice instantly updates labels, placeholders, and session state.
-  - RTL-aware navigation bar, card alignment, and typography.
-- **Game Screen (`src/app/game.tsx`)**:
-  - All gameplay prompts, privacy handover screens, action buttons, exit alerts, and result recap cards use `t(key, language, params)`.
-  - Pass The Phone and Group Session completion screens support RTL text alignment and logical direction.
-
----
-
-## Verification & Automated Test Suite
-
-We created and executed a dedicated Milestone 8.5 test suite (`src/services/i18n/localization.test.ts`) and verified backwards compatibility with all previous test suites.
-
-### Automated Test Results:
-
-```bash
---- Starting Milestone 8.5 Multi-Language Test Suite ---
-✓ 1. Language metadata and directions verified
-✓ 2. Direction helpers (isRTL & getTextDirection) verified
-✓ 3. Pure translation engine t() verified for all 4 languages
-✓ 4. String parameter interpolation verified in all 4 languages
-✓ 5. Deterministic English fallback verified
-✓ 6. Catalogs size parity verified: 60 questions across all 4 languages
-✓ 7. Stable canonical question identities verified across all catalogs
-✓ 8. Mode and Vibe metadata consistency verified across languages
-✓ 9. Arabic script presence verified in 100% of Arabic catalog
-✓ 10. ContentProvider localized querying verified
-✓ 11. AI Local Synthesizer Turkish generation with preserved player names verified
-✓ 12. AI Local Synthesizer Arabic generation with embedded player names verified
-✓ 13. AI Validator language script detection verified
-✓ 14. AIService pipeline French validation verified
-✓ 15. Question identity is language-invariant for cross-session deduplication
-✓ 16. Zustand Store language lifecycle verified
-✓ 17. Pass The Phone action buttons translated across all 4 languages
-✓ 18. Group Session turn actions translated across all 4 languages
-✓ 19. Session Type cards translated across all 4 languages
-✓ 20. WYR option A & B completeness verified in all 4 languages
-✓ 21. Hot Take agree & disagree labels verified in all 4 languages
-
-🎉 ALL 21/21 MILESTONE 8.5 LOCALIZATION TESTS PASSED PERFECTLY!
-
-🧪 Running Milestone 8 Pass The Phone Engine Tests...
-🎉 ALL 23 PASS THE PHONE ENGINE TESTS PASSED SUCCESSFULLY!
-
-🧪 Running Milestone 8 Response & Aggregation Engine Tests...
-🎉 ALL MILESTONE 8 RESPONSE & AGGREGATION TESTS PASSED!
-
-🧪 Running Milestone 7.5 Game Engine & Domain Test Suite...
-🎉 ALL MILESTONE 7.5 TESTS PASSED SUCCESSFULLY!
-
-🧪 Running AI Subsystem Architecture & Resilience Tests...
-🎉 ALL AI SUBSYSTEM ARCHITECTURE & RESILIENCE TESTS PASSED!
-```
-
-### Static Analysis:
-- **TypeScript**: `npx tsc --noEmit` $\rightarrow$ **0 errors (clean build)**
-- **ESLint**: `npm run lint` $\rightarrow$ **0 errors / 0 warnings**
+In this update, we resolved all 3 user requests:
+1. **Circular Language Button**: Replaced the 4 large language pills in the body with a sleek circular button in the top-left navigation bar (`🇬🇧`, `🇹🇷`, `🇫🇷`, `🇸🇦`) that opens a slide-up `LanguagePickerModal`.
+2. **Pass The Phone (Telefonu Pasla) Gameplay Mechanic**: Updated the game logic and strings across all 4 languages so that the **selector** (the person who chose the target) is the one facing the dilemma: either **take a shot to keep the secret hidden** from the target/group, or **reveal the question** to the target and the group.
+3. **Screen Scrolling Restored**: Fixed `ScreenContainer` ScrollView styles (`flexGrow: 1` without `flex: 1` locking in `contentContainerStyle`) and removed touch responder interception so screens scroll smoothly on all devices.
 
 ---
 
 ## Visual Verification (iOS Simulator)
 
-### Setup Screen with 4-Language Selector:
-![Language Selector UI](/Users/apple/.gemini/antigravity-ide/brain/48f4d0bc-3366-4934-b97b-dbeabf8755c7/sim_m85_ready.png)
+### Redesigned Setup Screen with Top-Left Circular Language Button
+![Setup Screen with Top-Left Circular Language Button](/Users/apple/.gemini/antigravity-ide/brain/48f4d0bc-3366-4934-b97b-dbeabf8755c7/sim_setup_circular_lang.png)
 
 ---
 
-## Conclusion
+## Detailed Changes
 
-Milestone 8.5 is fully complete and verified across code, domain types, engine logic, UI screens, and test suites. We are ready for your review.
+### 1. Circular Language Button & Modal (`src/components/ui/LanguagePickerModal.tsx` & `src/app/game-setup.tsx`)
+- Placed a 36x36 circular button with active flag emoji in the top-left navigation bar next to the back button.
+- Tapping the circular button opens the `LanguagePickerModal` with all 4 supported languages (`English`, `Türkçe`, `Français`, `العربية`).
+- Selecting a language updates the store and UI instantly while keeping the setup screen uncluttered.
+
+### 2. Pass The Phone Dilemma Logic (`src/engine/pass-phone-engine.ts`, `src/app/game.tsx`, `translations/*.ts`)
+- The selector chooses a target player.
+- The selector then chooses:
+  - 🥃 **Shot At (Sır Kalsın) / Take a Shot (Keep Secret)**: Selector drinks; the secret question remains 100% hidden from the target and the group.
+  - 👁️ **Soruyu İtiraf Et / Reveal Question**: Selector refuses to drink; the question and selection are revealed to the target and the group.
+- The outcome screen displays whether a shot was taken to keep the secret or the question was revealed before advancing to the next round.
+
+### 3. Screen Scrolling Fix (`src/components/ui/ScreenContainer.tsx`)
+- Fixed `ScrollView` inside `ScreenContainer` so `contentContainerStyle` expands dynamically with `flexGrow: 1` and does not inherit `flex: 1`.
+- Removed outer `TouchableWithoutFeedback` wrapper that intercepted scroll touch gestures in `game-setup.tsx`.
+
+---
+
+## Test & Build Verification
+
+- **Milestone 8.5 Localization Tests**: **21/21 passed** (`localization.test.ts`)
+- **Milestone 8 Pass The Phone Tests**: **23/23 passed** (`pass-phone-engine.test.ts`)
+- **Milestone 8 Group Response Tests**: **9/9 passed** (`response-engine.test.ts`)
+- **Milestone 7.5 Game Engine Tests**: **7/7 test groups passed** (`game-engine.test.ts`)
+- **Milestone 5.1 AI Tests**: **5/5 passed** (`ai-subsystem.test.ts`)
+- **TypeScript (`npx tsc --noEmit`)**: **0 errors**
+- **ESLint (`npm run lint`)**: **0 errors / 0 warnings**

@@ -144,44 +144,19 @@ export function commitPassPhoneAction(
     );
   }
 
-  const { activeSelectorPlayerId, selectedTargetPlayerId, shotsCount, roundHistory } =
-    session.passPhoneState;
+  const { selectedTargetPlayerId, shotsCount } = session.passPhoneState;
 
   if (!selectedTargetPlayerId) {
     throw new Error('No target player recorded in passPhoneState');
   }
 
-  if (action === 'take-shot') {
-    // Shot committed: round is immediately complete without revealing question!
-    const roundRecord: PassPhoneRoundRecord = {
-      roundNumber: session.currentRound,
-      questionId: session.currentQuestion?.id || 'unknown-q',
-      questionText: session.currentQuestion?.text || '',
-      selectorPlayerId: activeSelectorPlayerId,
-      targetPlayerId: selectedTargetPlayerId,
-      action: 'take-shot',
-      timestamp: Date.now(),
-    };
+  const nextShotsCount = action === 'take-shot' ? shotsCount + 1 : shotsCount;
 
-    const nextState: PassPhoneState = {
-      ...session.passPhoneState,
-      phase: 'ROUND_COMPLETE',
-      selectedAction: 'take-shot',
-      shotsCount: shotsCount + 1,
-      roundHistory: [...roundHistory, roundRecord],
-    };
-
-    return {
-      nextSession: { ...session, passPhoneState: nextState },
-      isRoundComplete: true,
-    };
-  }
-
-  // Action is 'show-question' (or other reveal): transition to REVEALING_QUESTION
   const nextState: PassPhoneState = {
     ...session.passPhoneState,
     phase: 'REVEALING_QUESTION',
     selectedAction: action,
+    shotsCount: nextShotsCount,
   };
 
   return {

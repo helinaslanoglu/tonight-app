@@ -5,17 +5,17 @@
  * and deterministic English fallback.
  */
 
-import { ar } from './translations/ar';
-import { en } from './translations/en';
-import { fr } from './translations/fr';
-import { tr } from './translations/tr';
+import { ARABIC_TRANSLATIONS } from './translations/ar';
+import { ENGLISH_TRANSLATIONS } from './translations/en';
+import { FRENCH_TRANSLATIONS } from './translations/fr';
+import { TURKISH_TRANSLATIONS } from './translations/tr';
 import type { LanguageId, TranslationKey, TranslationMap } from './types';
 
 const TRANSLATIONS: Record<LanguageId, TranslationMap> = {
-  en,
-  tr,
-  fr,
-  ar,
+  en: ENGLISH_TRANSLATIONS,
+  tr: TURKISH_TRANSLATIONS,
+  fr: FRENCH_TRANSLATIONS,
+  ar: ARABIC_TRANSLATIONS,
 };
 
 /**

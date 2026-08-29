@@ -6,11 +6,16 @@ import Animated, { FadeIn } from 'react-native-reanimated';
 import { AppButton } from '@/components/ui/AppButton';
 import { AppText } from '@/components/ui/AppText';
 import { Badge } from '@/components/ui/Badge';
+import { LanguageButton } from '@/components/ui/LanguageButton';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
+import { isRTL, t } from '@/services/i18n';
+import { useLanguage } from '@/store';
 import { theme } from '@/theme';
 
 export default function WelcomeScreen() {
   const router = useRouter();
+  const activeLanguage = useLanguage();
+  const rtl = isRTL(activeLanguage);
 
   const handleStart = () => {
     router.push('/vibes');
@@ -18,9 +23,17 @@ export default function WelcomeScreen() {
 
   return (
     <ScreenContainer contentStyle={styles.container}>
-      {/* Top Header Badge */}
-      <Animated.View entering={FadeIn.duration(500)} style={styles.topSection}>
-        <Badge label="PARTY GAME" color={theme.colors.accentMuted} textColor={theme.colors.accent} />
+      {/* Top Header Section with Badge & Language Selector Button */}
+      <Animated.View entering={FadeIn.duration(500)} style={[styles.topSection, rtl && styles.rowRTL]}>
+        <View style={styles.topSideSlot} />
+        <Badge
+          label={t('welcome.badge', activeLanguage)}
+          color={theme.colors.accentMuted}
+          textColor={theme.colors.accent}
+        />
+        <View style={styles.topSideSlot}>
+          <LanguageButton />
+        </View>
       </Animated.View>
 
       {/* Hero Brand & Taglines */}
@@ -33,16 +46,16 @@ export default function WelcomeScreen() {
 
         <Animated.View entering={FadeIn.duration(700)} style={styles.taglineContainer}>
           <AppText variant="subheading" style={styles.taglineWhite}>
-            You bring the people.
+            {t('welcome.tagline1', activeLanguage)}
           </AppText>
           <AppText variant="subheading" color="accent" style={styles.taglineAccent}>
-            We bring the chaos.
+            {t('welcome.tagline2', activeLanguage)}
           </AppText>
         </Animated.View>
 
         <Animated.View entering={FadeIn.duration(800)}>
           <AppText variant="body" color="secondary" style={styles.supportingText}>
-            Your night starts here.
+            {t('welcome.subtitle', activeLanguage)}
           </AppText>
         </Animated.View>
       </View>
@@ -55,7 +68,7 @@ export default function WelcomeScreen() {
           onPress={handleStart}
           style={styles.startButton}
         >
-          START
+          {t('welcome.startCta', activeLanguage)}
         </AppButton>
       </Animated.View>
     </ScreenContainer>
@@ -68,8 +81,17 @@ const styles = StyleSheet.create({
     paddingVertical: theme.spacing.lg,
   },
   topSection: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingTop: theme.spacing.sm,
+  },
+  topSideSlot: {
+    width: 44,
+    alignItems: 'flex-end',
+  },
+  rowRTL: {
+    flexDirection: 'row-reverse',
   },
   heroSection: {
     flex: 1,

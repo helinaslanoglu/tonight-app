@@ -11,9 +11,12 @@ import { AppButton } from '@/components/ui/AppButton';
 import { AppText } from '@/components/ui/AppText';
 import { Badge } from '@/components/ui/Badge';
 import { IconButton } from '@/components/ui/IconButton';
+import { LanguageButton } from '@/components/ui/LanguageButton';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { GAME_MODES, VIBES } from '@/data';
+import { isRTL, t } from '@/services/i18n';
 import {
+  useLanguage,
   usePlayers,
   useSelectedGameMode,
   useSelectedVibe,
@@ -29,8 +32,10 @@ export default function GameModeScreen() {
   const selectedVibeId = useSelectedVibe();
   const players = usePlayers();
   const currentModeId = useSelectedGameMode();
+  const activeLanguage = useLanguage();
   const setGameMode = useSetGameMode();
   const startGame = useStartGame();
+  const rtl = isRTL(activeLanguage);
 
   const [selectedMode, setSelectedMode] = useState<GameModeId | 'all'>(currentModeId || 'all');
   const [isStarting, setIsStarting] = useState(false);
@@ -48,33 +53,36 @@ export default function GameModeScreen() {
 
   return (
     <ScreenContainer scrollable contentStyle={styles.container}>
-      {/* Navigation Top Bar */}
-      <View style={styles.navBar}>
+      {/* Navigation Top Bar with Back & Language Selector Buttons */}
+      <View style={[styles.navBar, rtl && styles.navBarRTL]}>
         <IconButton
           variant="surface"
           size="sm"
           onPress={() => router.back()}
           accessibilityLabel="Go back to player setup"
         >
-          <AppText style={styles.backArrow}>←</AppText>
+          <AppText style={styles.backArrow}>{rtl ? '→' : '←'}</AppText>
         </IconButton>
 
-        {activeVibe && (
-          <Badge
-            label={`${activeVibe.emoji} ${activeVibe.label}`}
-            color={theme.colors.surfaceElevated}
-            textColor={vibeColor}
-          />
-        )}
+        <View style={[styles.navRightGroup, rtl && styles.rowRTL]}>
+          {activeVibe && (
+            <Badge
+              label={`${activeVibe.emoji} ${activeVibe.label}`}
+              color={theme.colors.surfaceElevated}
+              textColor={vibeColor}
+            />
+          )}
+          <LanguageButton />
+        </View>
       </View>
 
       {/* Hero Header */}
       <Animated.View entering={FadeIn.duration(350)} style={styles.header}>
-        <AppText variant="heading" style={styles.title}>
-          Choose Mode
+        <AppText variant="heading" style={[styles.title, rtl && styles.textRTL]}>
+          {t('gameMode.headerTitle', activeLanguage)}
         </AppText>
-        <AppText variant="body" color="secondary" style={styles.subtitle}>
-          Pick how you want to play with {players.length} players.
+        <AppText variant="body" color="secondary" style={[styles.subtitle, rtl && styles.textRTL]}>
+          {t('gameMode.headerSubtitle', activeLanguage, { count: players.length })}
         </AppText>
       </Animated.View>
 
@@ -95,19 +103,19 @@ export default function GameModeScreen() {
             pressed && styles.modeCardPressed,
           ]}
         >
-          <View style={styles.cardHeaderRow}>
+          <View style={[styles.cardHeaderRow, rtl && styles.rowRTL]}>
             <View style={styles.emojiCircle}>
               <AppText style={styles.modeEmoji}>🎲</AppText>
             </View>
             <View style={styles.modeTextContainer}>
-              <View style={styles.titleWithBadge}>
-                <AppText variant="label" style={styles.modeTitle}>
-                  Surprise Me (Mixed)
+              <View style={[styles.titleWithBadge, rtl && styles.rowRTL]}>
+                <AppText variant="label" style={[styles.modeTitle, rtl && styles.textRTL]}>
+                  {t('gameMode.allModes.label', activeLanguage)}
                 </AppText>
                 <Badge label="RECOMMENDED" size="sm" color={theme.colors.accentMuted} textColor={theme.colors.accent} />
               </View>
-              <AppText variant="caption" color="secondary" numberOfLines={2}>
-                Dynamic mix of all compatible modes tailored to your vibe.
+              <AppText variant="caption" color="secondary" numberOfLines={2} style={rtl && styles.textRTL}>
+                {t('gameMode.allModes.desc', activeLanguage)}
               </AppText>
             </View>
           </View>
@@ -148,15 +156,15 @@ export default function GameModeScreen() {
                 pressed && isEnabled && styles.modeCardPressed,
               ]}
             >
-              <View style={styles.cardHeaderRow}>
+              <View style={[styles.cardHeaderRow, rtl && styles.rowRTL]}>
                 <View style={styles.emojiCircle}>
                   <AppText style={styles.modeEmoji}>{mode.emoji}</AppText>
                 </View>
                 <View style={styles.modeTextContainer}>
-                  <View style={styles.titleWithBadge}>
+                  <View style={[styles.titleWithBadge, rtl && styles.rowRTL]}>
                     <AppText
                       variant="label"
-                      style={[styles.modeTitle, !isEnabled && styles.disabledText]}
+                      style={[styles.modeTitle, !isEnabled && styles.disabledText, rtl && styles.textRTL]}
                     >
                       {mode.label}
                     </AppText>
@@ -168,6 +176,7 @@ export default function GameModeScreen() {
                     variant="caption"
                     color={isEnabled ? 'secondary' : 'tertiary'}
                     numberOfLines={2}
+                    style={rtl && styles.textRTL}
                   >
                     {mode.tagline}
                   </AppText>
@@ -187,7 +196,7 @@ export default function GameModeScreen() {
           onPress={handleStart}
           style={styles.primaryCta}
         >
-          START GAME
+          {t('gameMode.startCta', activeLanguage)}
         </AppButton>
       </Animated.View>
     </ScreenContainer>
@@ -203,6 +212,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: theme.spacing.sm,
+  },
+  navBarRTL: {
+    flexDirection: 'row-reverse',
+  },
+  navRightGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+  },
+  rowRTL: {
+    flexDirection: 'row-reverse',
+  },
+  textRTL: {
+    textAlign: 'right',
   },
   backArrow: {
     fontSize: 18,
