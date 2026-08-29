@@ -65,6 +65,8 @@ export interface BaseQuestion {
   text: string;
   vibeId: VibeId;
   language?: LanguageId;
+  /** Explicit structured target player ID when the question targets a specific participant */
+  targetPlayerId?: string;
 }
 
 export interface WouldYouRatherQuestion extends BaseQuestion {
@@ -90,7 +92,11 @@ export interface HotTakeQuestion extends BaseQuestion {
 
 export interface WhoKnowsMeBestQuestion extends BaseQuestion {
   gameModeId: 'who-knows-me-best';
+  /** Explicit structured target player ID for the spotlight participant */
+  targetPlayerId?: string;
   prompt?: string;
+  optionA?: string;
+  optionB?: string;
 }
 
 export type Question =
@@ -149,6 +155,8 @@ export interface StanceResponse extends BasePlayerResponse {
 export interface SpotlightResponse extends BasePlayerResponse {
   responseType: 'spotlight-quiz';
   targetPlayerId?: string;
+  selectedOption?: 'A' | 'B';
+  confirmed?: boolean;
 }
 
 export interface DiscussionResponse extends BasePlayerResponse {

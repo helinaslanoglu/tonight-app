@@ -103,7 +103,6 @@ export default function GameScreen() {
   const [selectedOption, setSelectedOption] = useState<'A' | 'B' | undefined>(undefined);
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | undefined>(undefined);
   const [selectedStance, setSelectedStance] = useState<'agree' | 'disagree' | undefined>(undefined);
-  const [spotlightPlayerId, setSpotlightPlayerId] = useState<string | undefined>(undefined);
 
   // Local Pass The Phone privacy overlay state
   const [passPhoneOverlayVisible, setPassPhoneOverlayVisible] = useState(false);
@@ -114,6 +113,10 @@ export default function GameScreen() {
 
   const activeVibe = VIBES.find((v) => v.id === selectedVibeId);
   const vibeColor = selectedVibeId ? getVibeColor(selectedVibeId) : theme.colors.accent;
+
+  const currentPlayer = useMemo(() => {
+    return players[currentPlayerIndex] || players[0];
+  }, [players, currentPlayerIndex]);
 
   const currentMode = useMemo(() => {
     if (!currentQuestion) return null;
@@ -151,7 +154,6 @@ export default function GameScreen() {
     setSelectedOption(undefined);
     setSelectedPlayerId(undefined);
     setSelectedStance(undefined);
-    setSpotlightPlayerId(undefined);
   };
 
   // Redirect if no session exists
@@ -172,13 +174,12 @@ export default function GameScreen() {
       case 'stance':
         return selectedStance !== undefined;
       case 'spotlight-quiz':
-        return spotlightPlayerId !== undefined;
       case 'discussion':
         return true;
       default:
         return false;
     }
-  }, [currentQuestion, interactionType, selectedOption, selectedPlayerId, selectedStance, spotlightPlayerId]);
+  }, [currentQuestion, interactionType, selectedOption, selectedPlayerId, selectedStance]);
 
   // Handle Advance for Standard & Group Modes
   const handleNext = async () => {
@@ -196,7 +197,11 @@ export default function GameScreen() {
         } else if (interactionType === 'stance' && selectedStance) {
           res = await submitPlayerResponse({ responseType: 'stance', selectedStance });
         } else if (interactionType === 'spotlight-quiz') {
-          res = await submitPlayerResponse({ responseType: 'spotlight-quiz', targetPlayerId: spotlightPlayerId });
+          res = await submitPlayerResponse({
+            responseType: 'spotlight-quiz',
+            targetPlayerId: currentQuestion?.targetPlayerId,
+            confirmed: true,
+          });
         } else {
           res = await submitPlayerResponse({ responseType: 'discussion', confirmed: true });
         }
@@ -218,7 +223,7 @@ export default function GameScreen() {
           selectedOption,
           selectedPlayerId,
           selectedStance,
-          targetPlayerId: spotlightPlayerId,
+          targetPlayerId: currentQuestion?.targetPlayerId,
         });
         resetLocalSelections();
       }
@@ -849,16 +854,22 @@ export default function GameScreen() {
           </Animated.View>
         )}
 
-        {/* Phase 3: TARGET_ACTION (Selector's Dilemma) */}
+        {/* Phase 3: TARGET_ACTION (Confrontation & Decision) */}
         {passPhonePhase === 'TARGET_ACTION' && passPhoneTarget && (
           <Animated.View entering={FadeIn.duration(300)} style={styles.passPhoneMiddlePhase}>
             <View style={styles.passPhoneCard}>
               <AppText style={styles.hugeEmoji}>🥃</AppText>
               <AppText variant="display" style={[styles.passPhoneTitle, rtl && styles.textRTL]}>
-                {t('passPhone.actionTitle', language)}
+                {t('passPhone.actionTitle', language, {
+                  selector: passPhoneSelector.name,
+                  target: passPhoneTarget.name,
+                })}
               </AppText>
               <AppText variant="body" color="secondary" style={[styles.passPhoneSubtext, rtl && styles.textRTL]}>
-                {t('passPhone.actionSubtitle', language, { target: passPhoneTarget.name })}
+                {t('passPhone.actionSubtitle', language, {
+                  selector: passPhoneSelector.name,
+                  target: passPhoneTarget.name,
+                })}
               </AppText>
 
               <View style={styles.actionButtons}>
@@ -871,7 +882,10 @@ export default function GameScreen() {
                   }}
                   style={styles.shotButton}
                 >
-                  {t('passPhone.takeShotButton', language)}
+                  {t('passPhone.takeShotButton', language, {
+                    selector: passPhoneSelector.name,
+                    target: passPhoneTarget.name,
+                  })}
                 </AppButton>
 
                 <AppButton
@@ -1075,8 +1089,8 @@ export default function GameScreen() {
               <WhoKnowsMeBestInteraction
                 question={currentQuestion as WhoKnowsMeBestQuestion}
                 players={players}
-                spotlightPlayerId={spotlightPlayerId}
-                onSelectSpotlightPlayer={(id) => setSpotlightPlayerId(id)}
+                respondingPlayer={currentPlayer}
+                isGroupSession={sessionType === 'group'}
               />
             )}
 

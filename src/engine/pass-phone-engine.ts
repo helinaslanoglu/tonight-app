@@ -205,6 +205,7 @@ export function acknowledgePassPhoneReveal(session: GameSession): GameSession {
 
 /**
  * Step 5: Advances Pass The Phone session to the next round with a new question and selector.
+ * The player who was targeted and received the phone becomes the new active selector!
  */
 export function advancePassPhoneRound(
   session: GameSession,
@@ -215,11 +216,17 @@ export function advancePassPhoneRound(
   }
 
   const players = session.players;
-  const currentSelectorIdx = players.findIndex(
-    (p) => p.id === session.passPhoneState?.activeSelectorPlayerId
-  );
-  const nextSelectorIdx = (currentSelectorIdx + 1) % players.length;
-  const nextSelector = players[nextSelectorIdx] || players[0];
+  // The player who just received the phone becomes the new active selector for the next round!
+  const lastTargetId =
+    session.passPhoneState.selectedTargetPlayerId ||
+    session.passPhoneState.roundHistory[session.passPhoneState.roundHistory.length - 1]?.targetPlayerId;
+
+  const targetPlayer = players.find((p) => p.id === lastTargetId);
+
+  const fallbackIdx =
+    (players.findIndex((p) => p.id === session.passPhoneState?.activeSelectorPlayerId) + 1) %
+    players.length;
+  const nextSelector = targetPlayer || players[fallbackIdx] || players[0];
 
   const nextRoundNumber = session.currentRound + 1;
   const isSessionFinished = session.currentRound >= session.totalRounds;

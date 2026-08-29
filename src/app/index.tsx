@@ -23,17 +23,15 @@ export default function WelcomeScreen() {
 
   return (
     <ScreenContainer contentStyle={styles.container}>
-      {/* Top Header Section with Badge & Language Selector Button */}
+      {/* Top Header Section: Circular Language Selector on Left, Badge in Center */}
       <Animated.View entering={FadeIn.duration(500)} style={[styles.topSection, rtl && styles.rowRTL]}>
-        <View style={styles.topSideSlot} />
+        <LanguageButton />
         <Badge
           label={t('welcome.badge', activeLanguage)}
           color={theme.colors.accentMuted}
           textColor={theme.colors.accent}
         />
-        <View style={styles.topSideSlot}>
-          <LanguageButton />
-        </View>
+        <View style={styles.topSideSlot} />
       </Animated.View>
 
       {/* Hero Brand & Taglines */}
@@ -87,8 +85,7 @@ const styles = StyleSheet.create({
     paddingTop: theme.spacing.sm,
   },
   topSideSlot: {
-    width: 44,
-    alignItems: 'flex-end',
+    width: 38,
   },
   rowRTL: {
     flexDirection: 'row-reverse',

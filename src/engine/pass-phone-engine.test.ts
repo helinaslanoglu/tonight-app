@@ -175,13 +175,13 @@ async function runPassPhoneEngineTests() {
   };
   session = advancePassPhoneRound(session, q3);
   assert(session.currentRound === 3, 'Must advance to Round 3');
-  assert(session.passPhoneState?.activeSelectorPlayerId === 'player_03', 'Selector is Ece (player_03)');
+  assert(session.passPhoneState?.activeSelectorPlayerId === 'player_04', 'Selector is Can (player_04) who received the phone');
 
-  // Ece selects Mert (player_02)
+  // Can selects Mert (player_02)
   session = selectPassPhoneTarget(session, 'player_02');
   session = confirmPassPhoneHandover(session);
 
-  // Ece takes a shot to keep secret!
+  // Can takes a shot to keep secret!
   const finalShotResult = commitPassPhoneAction(session, 'take-shot');
   assert(!finalShotResult.isRoundComplete, 'take-shot displays outcome screen before completing');
   session = acknowledgePassPhoneReveal(finalShotResult.nextSession);
@@ -195,10 +195,9 @@ async function runPassPhoneEngineTests() {
   // Rounds summary:
   // Round 1: Helin (p1) -> Mert (p2), action: show-question
   // Round 2: Mert (p2) -> Can (p4), action: take-shot
-  // Round 3: Ece (p3) -> Mert (p2), action: take-shot
+  // Round 3: Can (p4) -> Mert (p2), action: take-shot
   // Total rounds = 3, Total shots = 2
   // Targeted: Mert (2x), Can (1x) => Most Targeted = Mert (2)
-  // Selectors: Helin (1x), Mert (1x), Ece (1x) => 3-way tie for top selector
   const results = aggregatePassPhoneResult(session);
   assert(results.totalRounds === 3, 'Total rounds must be 3');
   assert(results.totalShots === 2, 'Total shots must be 2');
@@ -208,8 +207,8 @@ async function runPassPhoneEngineTests() {
   // Verify Relationship Matrix
   assert(results.relationshipMatrix['player_01']['player_02'] === 1, 'Helin -> Mert = 1');
   assert(results.relationshipMatrix['player_02']['player_04'] === 1, 'Mert -> Can = 1');
-  assert(results.relationshipMatrix['player_03']['player_02'] === 1, 'Ece -> Mert = 1');
-  assert(results.relationshipMatrix['player_04']['player_01'] === 0, 'Can -> Helin = 0');
+  assert(results.relationshipMatrix['player_04']['player_02'] === 1, 'Can -> Mert = 1');
+  assert(results.relationshipMatrix['player_03']['player_02'] === 0, 'Ece -> Mert = 0');
   console.log('  ✅ Tests 17-21 Passed: Structured PassPhoneResult and 2D matrix 100% accurate.');
 
   // ─── Test 22 & 23: Invalid State Transitions & Action Protection ────────────

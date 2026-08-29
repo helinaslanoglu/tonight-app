@@ -26,6 +26,35 @@ export {
 export { VIBES } from './vibes';
 
 /**
+ * Hydrates questions with active session players:
+ * - For Who Knows Me Best questions, deterministically assigns a target player from the roster,
+ *   embeds the target player's name into the text, and sets `targetPlayerId`.
+ */
+export function hydrateQuestionsForPlayers(
+  questions: Question[],
+  players?: Player[]
+): Question[] {
+  if (!players || players.length === 0) {
+    return questions;
+  }
+
+  return questions.map((q, index) => {
+    if (q.gameModeId === 'who-knows-me-best') {
+      const targetPlayer = players[index % players.length] || players[0];
+      const hydratedText = q.text.replace(/\{target\}/g, targetPlayer.name);
+      const hydratedPrompt = q.prompt ? q.prompt.replace(/\{target\}/g, targetPlayer.name) : undefined;
+      return {
+        ...q,
+        targetPlayerId: targetPlayer.id,
+        text: hydratedText,
+        prompt: hydratedPrompt,
+      };
+    }
+    return q;
+  });
+}
+
+/**
  * Data Access Layer (Hybrid Content Provider)
  * ───────────────────────────────────────────
  * Decouples the UI and game engine from content sources.
@@ -76,6 +105,10 @@ export const defaultContentProvider: ContentProvider = {
 
     if (filter?.gameModeId) {
       result = result.filter((q) => q.gameModeId === filter.gameModeId);
+    }
+
+    if (filter?.players && filter.players.length > 0) {
+      result = hydrateQuestionsForPlayers(result, filter.players);
     }
 
     if (filter?.limit && filter.limit > 0) {

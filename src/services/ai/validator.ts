@@ -193,12 +193,27 @@ export function validateAndSanitizeQuestion(
   // ─── Who Knows Me Best ───────────────────────────────────────────────────────
   if (mode === 'who-knows-me-best') {
     const cleanPrompt = typeof q.prompt === 'string' ? sanitizeString(q.prompt) : undefined;
+    const targetPlayerId = typeof q.targetPlayerId === 'string' ? sanitizeString(q.targetPlayerId) : undefined;
+
+    // Semantic validation: Reject any fictional game mechanics in prompt
+    if (cleanPrompt) {
+      const hasFictionalMechanics =
+        /\b(gerçeği açıklar|reveals the truth|grades the answers)\b/i.test(cleanPrompt);
+      if (hasFictionalMechanics) {
+        return {
+          isValid: false,
+          reason: 'Who Knows Me Best questions must not include fictional truth/reveal/scoring mechanics in prompts',
+        };
+      }
+    }
+
     return {
       isValid: true,
       sanitizedQuestion: {
         id,
         vibeId: q.vibeId as Question['vibeId'],
         gameModeId: 'who-knows-me-best',
+        targetPlayerId: targetPlayerId && targetPlayerId.length > 0 ? targetPlayerId : undefined,
         language: qLang,
         text: cleanText,
         prompt: cleanPrompt && cleanPrompt.length > 0 ? cleanPrompt : undefined,

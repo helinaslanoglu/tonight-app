@@ -93,7 +93,7 @@ interface GameActions {
       | { responseType: 'choice'; selectedOption: 'A' | 'B' }
       | { responseType: 'player-select'; selectedPlayerId: string }
       | { responseType: 'stance'; selectedStance: 'agree' | 'disagree' }
-      | { responseType: 'spotlight-quiz'; targetPlayerId?: string }
+      | { responseType: 'spotlight-quiz'; targetPlayerId?: string; selectedOption?: 'A' | 'B'; confirmed?: boolean }
       | { responseType: 'discussion'; confirmed?: boolean }
   ) => Promise<{ isQuestionComplete: boolean }>;
 
@@ -172,6 +172,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       language,
       vibeId: session.vibeId,
       gameModeId: selectedMode !== 'all' ? selectedMode : undefined,
+      players: session.players,
     });
     const newSession = startNewSession({
       vibeId: session.vibeId,
@@ -238,7 +239,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       questionId: session.currentQuestion.id,
       gameModeId: session.currentQuestion.gameModeId,
       selectedPlayerId: partialAnswer?.selectedPlayerId,
-      targetPlayerId: partialAnswer?.targetPlayerId,
+      targetPlayerId: partialAnswer?.targetPlayerId || session.currentQuestion.targetPlayerId,
       selectedOption: partialAnswer?.selectedOption,
       selectedStance: partialAnswer?.selectedStance,
       timestamp: Date.now(),
@@ -247,7 +248,10 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     const pool =
       questionPool.length > 0
         ? questionPool
-        : await defaultContentProvider.getQuestions({ language: session.language || 'en' });
+        : await defaultContentProvider.getQuestions({
+            language: session.language || 'en',
+            players: session.players,
+          });
     const advancedSession = advanceSessionRound(
       session,
       answer,
@@ -282,6 +286,10 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       sessionId: session.id,
       questionId: session.currentQuestion.id,
       playerId: answeringPlayer.id,
+      targetPlayerId:
+        responseInput.responseType === 'spotlight-quiz'
+          ? responseInput.targetPlayerId || session.currentQuestion.targetPlayerId
+          : undefined,
       timestamp: Date.now(),
       ...responseInput,
     } as PlayerResponse;
@@ -296,7 +304,12 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
 
     // All players answered the current question! Advance to next round.
     const pool =
-      questionPool.length > 0 ? questionPool : await defaultContentProvider.getQuestions();
+      questionPool.length > 0
+        ? questionPool
+        : await defaultContentProvider.getQuestions({
+            language: session.language || 'en',
+            players: session.players,
+          });
 
     const summaryAnswer: RoundAnswer = {
       round: session.currentRound,

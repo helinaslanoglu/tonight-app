@@ -44,7 +44,7 @@ const DUO_TEMPLATES_BY_VIBE: Record<VibeId, PersonalizedTemplate[]> = {
     {
       mode: 'who-knows-me-best',
       text: (p1) => `What is ${p1}'s biggest romantic weakness or soft spot?`,
-      prompt: (p1, p2) => `${p2} takes the first guess before ${p1} reveals the truth!`,
+      prompt: (p1, p2) => `${p2} shares what they know about ${p1}.`,
     },
     {
       mode: 'open-question',
@@ -101,7 +101,7 @@ const DUO_TEMPLATES_BY_VIBE: Record<VibeId, PersonalizedTemplate[]> = {
     {
       mode: 'who-knows-me-best',
       text: (p1) => `What is ${p1}'s weirdest late-night snack combination?`,
-      prompt: (p1, p2) => `${p2} guess ${p1}'s midnight guilty pleasure!`,
+      prompt: (p1, p2) => `${p2} shares what they think ${p1} loves eating late at night.`,
     },
   ],
   party: [
@@ -124,7 +124,7 @@ const DUO_TEMPLATES_BY_VIBE: Record<VibeId, PersonalizedTemplate[]> = {
     {
       mode: 'who-knows-me-best',
       text: (p1) => `What song will guaranteed get ${p1} screaming every single lyric?`,
-      prompt: (p1, p2) => `${p2} guess before ${p1} reveals!`,
+      prompt: (p1, p2) => `${p2} shares which track gets ${p1} hyped.`,
     },
   ],
   'deep-talk': [
@@ -188,7 +188,7 @@ const GROUP_TEMPLATES_BY_VIBE: Record<VibeId, PersonalizedTemplate[]> = {
     {
       mode: 'who-knows-me-best',
       text: (p1) => `What is ${p1}'s absolute dream hype song when going out?`,
-      prompt: (p1) => `${p1} holds the answer. The rest of the group guesses!`,
+      prompt: (p1) => `Share what you know about ${p1}.`,
     },
     {
       mode: 'open-question',
@@ -216,7 +216,7 @@ const GROUP_TEMPLATES_BY_VIBE: Record<VibeId, PersonalizedTemplate[]> = {
     {
       mode: 'who-knows-me-best',
       text: (p1) => `What is ${p1}'s weirdest guilty pleasure snack?`,
-      prompt: (p1) => `Group guesses what ${p1} loves eating late at night!`,
+      prompt: (p1) => `Share what you think ${p1} loves eating late at night.`,
     },
     {
       mode: 'open-question',
@@ -261,7 +261,7 @@ const GROUP_TEMPLATES_BY_VIBE: Record<VibeId, PersonalizedTemplate[]> = {
     {
       mode: 'who-knows-me-best',
       text: (p1) => `What is ${p1}'s biggest pet peeve on a first date?`,
-      prompt: (p1) => `Everyone guess ${p1}'s instant dealbreaker!`,
+      prompt: (p1) => `Discuss what ${p1} dislikes on a date.`,
     },
     {
       mode: 'open-question',
@@ -384,7 +384,7 @@ function getLocalizedTemplate(
     if (base.mode === 'who-knows-me-best') {
       return {
         text: () => `${p1} için en unutulmaz tatil veya seyahat hayali nedir?`,
-        prompt: () => `${p2} ilk tahmini yapar, sonra ${p1} gerçeği açıklar!`,
+        prompt: () => `${p2}, ${p1} hakkında ne düşündüğünü paylaşıyor.`,
       };
     }
     return {
@@ -444,7 +444,7 @@ function getLocalizedTemplate(
     if (base.mode === 'who-knows-me-best') {
       return {
         text: () => `Quel est le plus grand point faible romantique de ${p1} ?`,
-        prompt: () => `${p2} devine en premier avant la révélation de ${p1} !`,
+        prompt: () => `${p2} partage ce qu’il pense de ${p1}.`,
       };
     }
     return {
@@ -504,7 +504,7 @@ function getLocalizedTemplate(
     if (base.mode === 'who-knows-me-best') {
       return {
         text: () => `ما هي أمنية السفر المفضلة والأهم لدى ${p1}؟`,
-        prompt: () => `ليخمن ${p2} أولاً قبل أن يكشف ${p1} الحقيقة!`,
+        prompt: () => `يشارك ${p2} رأيه حول ${p1}.`,
       };
     }
     return {
@@ -599,13 +599,15 @@ export class LocalSynthesizerProvider implements AIQuestionProvider {
           disagreeLabel: localized.disagreeLabel || 'DISAGREE',
         });
       } else if (template.mode === 'who-knows-me-best') {
+        const targetPlayer = players[p1Index] || players[0];
         questions.push({
           id: qId,
           vibeId,
           gameModeId: 'who-knows-me-best',
+          targetPlayerId: targetPlayer.id,
           language,
           text: localized.text(p1, p2),
-          prompt: localized.prompt ? localized.prompt(p1, p2) : 'Guess the truth!',
+          prompt: localized.prompt ? localized.prompt(p1, p2) : undefined,
         });
       } else {
         questions.push({

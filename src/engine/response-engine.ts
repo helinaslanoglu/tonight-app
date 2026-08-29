@@ -19,6 +19,7 @@ import type {
   PlayerResponse,
   PlayerSelectionResponse,
   PlayerSelectionStats,
+  SpotlightResponse,
   StanceBreakdown,
   StanceResponse,
 } from '@/types';
@@ -113,7 +114,19 @@ export function validatePlayerResponse(
       }
       break;
     }
-    case 'spotlight-quiz':
+    case 'spotlight-quiz': {
+      const targetId = (response as SpotlightResponse).targetPlayerId;
+      if (targetId) {
+        const targetPlayerExists = session.players.some((p) => p.id === targetId);
+        if (!targetPlayerExists) {
+          return {
+            isValid: false,
+            reason: `Target player ${targetId} does not exist in the session roster`,
+          };
+        }
+      }
+      break;
+    }
     case 'discussion':
     default:
       break;
