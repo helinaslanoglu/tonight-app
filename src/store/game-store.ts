@@ -157,7 +157,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     }
 
     const staticQuestions = await defaultContentProvider.getQuestions();
-    const replayedSession = replaySession(session, staticQuestions);
+    const replayedSession = replaySession(session, staticQuestions, session.usedQuestionIds);
 
     set({ session: replayedSession, questionPool: staticQuestions });
 

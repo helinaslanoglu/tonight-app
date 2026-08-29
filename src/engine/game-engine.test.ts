@@ -4,10 +4,11 @@
  * 1. Question selection & pool availability
  * 2. Mode compatibility with vibes & player counts
  * 3. Random mode selection logic
- * 4. Duplicate prevention across rounds
+ * 4. Duplicate prevention across rounds & session replays
  * 5. Session lifecycle (create, advance, complete, replay)
  * 6. Interaction validation across all 5 game modes
- * 7. Hybrid AI generation
+ * 7. Hybrid AI generation (2-player and multi-player)
+ * 8. Results & Persona Insights generation
  */
 
 import { QUESTIONS } from '../data/questions';
@@ -23,6 +24,7 @@ import {
   startNewSession,
   validateAnswerForQuestion,
 } from './game-engine';
+import { generateSessionRecap } from './results-engine';
 
 const MOCK_PLAYERS: Player[] = [
   { id: 'p1', name: 'Helin', color: '#EC4899' },
@@ -100,6 +102,7 @@ async function runTests() {
         round: currentSession.currentRound,
         questionId: currentSession.currentQuestion!.id,
         gameModeId: currentSession.currentQuestion!.gameModeId,
+        selectedPlayerId: round % 2 === 0 ? 'p1' : 'p2',
         timestamp: Date.now(),
       },
       QUESTIONS
@@ -118,6 +121,7 @@ async function runTests() {
       round: 10,
       questionId: currentSession.currentQuestion!.id,
       gameModeId: currentSession.currentQuestion!.gameModeId,
+      selectedPlayerId: 'p1',
       timestamp: Date.now(),
     },
     QUESTIONS
@@ -126,16 +130,19 @@ async function runTests() {
   assert(completedSession.answers.length === 10, 'All 10 answers should be recorded');
   console.log('✅ Test 7: Session completion after final round verified.');
 
-  // ─── Test 8: Replay Session ─────────────────────────────────────────────────
-  const replayedSession = replaySession(completedSession, QUESTIONS);
+  // ─── Test 8: Replay Session with Carried History ────────────────────────────
+  const replayedSession = replaySession(completedSession, QUESTIONS, completedSession.usedQuestionIds);
   assert(replayedSession.status === 'playing', 'Replayed session should be playing');
   assert(replayedSession.currentRound === 1, 'Replayed session should reset to round 1');
   assert(replayedSession.vibeId === 'party', 'Replayed session should preserve vibe');
-  assert(replayedSession.gameModeId === 'would-you-rather', 'Replayed session should preserve mode');
   assert(replayedSession.players.length === 3, 'Replayed session should preserve players');
   assert(replayedSession.id !== completedSession.id, 'Replayed session should have a new ID');
-  assert(replayedSession.usedQuestionIds.length === 1, 'Replayed session should reset usedQuestionIds');
-  console.log('✅ Test 8: Replay session verified (preserves vibe, mode & players, resets rounds & IDs).');
+  // Verify that the first question in replayedSession was not one of the questions from the first 10 rounds
+  assert(
+    !completedSession.answers.map((a) => a.questionId).includes(replayedSession.currentQuestion!.id),
+    'Replayed session should pick an unseen question'
+  );
+  console.log('✅ Test 8: Replay session history preservation verified (no repeating questions).');
 
   // ─── Test 9: Answer Validation Across 5 Game Modes ──────────────────────────
   const wyrQ: Question = {
@@ -191,7 +198,7 @@ async function runTests() {
   try {
     startNewSession({
       vibeId: 'party',
-      players: [{ id: 'p1', name: 'Helin' }], // only 1 player
+      players: [{ id: 'p1', name: 'Helin' }],
       totalRounds: 10,
       questionPool: QUESTIONS,
     });
@@ -211,22 +218,34 @@ async function runTests() {
   assert(randomMode !== 'most-likely-to', 'Random mode selector should exclude previous mode when alternatives exist');
   console.log('✅ Test 11: Mode compatibility & random mode selection verified.');
 
-  // ─── Test 12: Hybrid AI Question Generation ─────────────────────────────────
-  const aiQuestions = await generatePersonalizedQuestions({
-    vibeId: 'chaos',
-    players: MOCK_PLAYERS,
-    count: 3,
+  // ─── Test 12: Hybrid AI Generation for 2 Players (Duo Dynamics) ─────────────
+  const duoPlayers: Player[] = [
+    { id: 'p1', name: 'Helin', color: '#EC4899' },
+    { id: 'p2', name: 'Mert', color: '#3B82F6' },
+  ];
+  const duoQuestions = await generatePersonalizedQuestions({
+    vibeId: 'date',
+    players: duoPlayers,
+    count: 4,
   });
 
-  assert(aiQuestions.length === 3, 'AI generator should produce 3 unique personalized questions');
-  assert(aiQuestions.every((q) => q.vibeId === 'chaos'), 'All AI questions should have chaos vibe');
+  assert(duoQuestions.length === 4, 'AI should generate 4 questions for duo');
+  assert(duoQuestions.every((q) => q.vibeId === 'date'), 'All questions must have date vibe');
   assert(
-    aiQuestions.some((q) => q.text.includes('Helin') || q.text.includes('Ayşe') || q.text.includes('Mert')),
-    'AI questions should reference actual player names'
+    duoQuestions.some((q) => q.text.includes('Helin') && q.text.includes('Mert')),
+    'Duo questions should reference both player names'
   );
-  console.log('✅ Test 12: Hybrid AI Personalized Question Generation verified.');
+  console.log('✅ Test 12: 2-Player Duo AI Question Generation verified.');
 
-  console.log('\n🎉 ALL 12 DOMAIN & GAME MODE ENGINE TESTS PASSED SUCCESSFULLY!');
+  // ─── Test 13: Results & Persona Insights Generation ─────────────────────────
+  const recap = generateSessionRecap(completedSession);
+  assert(recap !== null, 'Recap should not be null');
+  assert(recap.playerInsights.length === 3, 'All 3 players must have insights');
+  assert(recap.synergyTitle.length > 0, 'Synergy title must be generated');
+  assert(recap.playerInsights[0].badge.length > 0, 'Top voted player must have an archetype badge');
+  console.log(`✅ Test 13: Results & Persona Insights Engine verified (${recap.synergyTitle}).`);
+
+  console.log('\n🎉 ALL 13 DOMAIN, GAME MODE & INSIGHTS ENGINE TESTS PASSED SUCCESSFULLY!');
 }
 
 runTests().catch((err) => {

@@ -3,11 +3,13 @@ import type { Question } from '@/types';
 /**
  * Question dataset for Tonight party game.
  * Original questions across 5 game modes and 6 vibes.
+ * Designed with rich variety so sessions never feel repetitive.
  */
 export const QUESTIONS: Question[] = [
   // ─────────────────────────────────────────────────────────────────────────────
   // 1. WOULD YOU RATHER
   // ─────────────────────────────────────────────────────────────────────────────
+  // Party
   {
     id: 'wyr-party-1',
     vibeId: 'party',
@@ -33,6 +35,24 @@ export const QUESTIONS: Question[] = [
     optionB: 'VIP Bartender',
   },
   {
+    id: 'wyr-party-4',
+    vibeId: 'party',
+    gameModeId: 'would-you-rather',
+    text: 'Would you rather always arrive 2 hours too early to every party or 2 hours too late when the vibe is dying?',
+    optionA: '2 hours too early',
+    optionB: '2 hours too late',
+  },
+  {
+    id: 'wyr-party-5',
+    vibeId: 'party',
+    gameModeId: 'would-you-rather',
+    text: 'Would you rather accidentally spill a red drink on the host’s white couch or break the bathroom lock during a party?',
+    optionA: 'Spill on white couch',
+    optionB: 'Break bathroom lock',
+  },
+
+  // Funny
+  {
     id: 'wyr-funny-1',
     vibeId: 'funny',
     gameModeId: 'would-you-rather',
@@ -56,6 +76,24 @@ export const QUESTIONS: Question[] = [
     optionA: 'Mayo sweat',
     optionB: 'Glitter sneeze',
   },
+  {
+    id: 'wyr-funny-4',
+    vibeId: 'funny',
+    gameModeId: 'would-you-rather',
+    text: 'Would you rather have to speak in rhymes for 24 hours or do jazz hands after every sentence?',
+    optionA: 'Speak in rhymes',
+    optionB: 'Dramatic jazz hands',
+  },
+  {
+    id: 'wyr-funny-5',
+    vibeId: 'funny',
+    gameModeId: 'would-you-rather',
+    text: 'Would you rather have your browser history projected in a movie theater or your camera roll deleted forever?',
+    optionA: 'Screen history in theater',
+    optionB: 'Lose camera roll',
+  },
+
+  // Chaos
   {
     id: 'wyr-chaos-1',
     vibeId: 'chaos',
@@ -81,6 +119,16 @@ export const QUESTIONS: Question[] = [
     optionB: 'Nemesis for a day',
   },
   {
+    id: 'wyr-chaos-4',
+    vibeId: 'chaos',
+    gameModeId: 'would-you-rather',
+    text: 'Would you rather let everyone in the room read your blocked contacts list or see your screen time breakdown?',
+    optionA: 'Blocked contacts list',
+    optionB: 'Screen time breakdown',
+  },
+
+  // Date
+  {
     id: 'wyr-date-1',
     vibeId: 'date',
     gameModeId: 'would-you-rather',
@@ -96,6 +144,24 @@ export const QUESTIONS: Question[] = [
     optionA: 'Know immediately',
     optionB: 'Enjoy the mystery',
   },
+  {
+    id: 'wyr-date-3',
+    vibeId: 'date',
+    gameModeId: 'would-you-rather',
+    text: 'Would you rather go on a spontaneous 3 AM road trip or have a candlelit rooftop dinner with deep talks?',
+    optionA: '3 AM spontaneous drive',
+    optionB: 'Rooftop dinner & wine',
+  },
+  {
+    id: 'wyr-date-4',
+    vibeId: 'date',
+    gameModeId: 'would-you-rather',
+    text: 'Would you rather have unmatched intellectual chemistry or irresistible physical chemistry?',
+    optionA: 'Intellectual sparks',
+    optionB: 'Magnetic chemistry',
+  },
+
+  // Deep Talk
   {
     id: 'wyr-deeptalk-1',
     vibeId: 'deep-talk',
@@ -113,6 +179,16 @@ export const QUESTIONS: Question[] = [
     optionB: 'Deeply by 5 people',
   },
   {
+    id: 'wyr-deeptalk-3',
+    vibeId: 'deep-talk',
+    gameModeId: 'would-you-rather',
+    text: 'Would you rather relive your best memory one more time or erase your most painful regret?',
+    optionA: 'Relive best memory',
+    optionB: 'Erase worst regret',
+  },
+
+  // Chill
+  {
     id: 'wyr-chill-1',
     vibeId: 'chill',
     gameModeId: 'would-you-rather',
@@ -128,10 +204,19 @@ export const QUESTIONS: Question[] = [
     optionA: 'Movie marathon',
     optionB: 'Board games & snacks',
   },
+  {
+    id: 'wyr-chill-3',
+    vibeId: 'chill',
+    gameModeId: 'would-you-rather',
+    text: 'Would you rather live by a serene beach with no wifi or in a vibrant city with no quiet hours?',
+    optionA: 'Quiet beach cottage',
+    optionB: 'Vibrant neon city',
+  },
 
   // ─────────────────────────────────────────────────────────────────────────────
   // 2. MOST LIKELY TO
   // ─────────────────────────────────────────────────────────────────────────────
+  // Party
   {
     id: 'mlt-party-1',
     vibeId: 'party',
@@ -151,6 +236,14 @@ export const QUESTIONS: Question[] = [
     text: 'Who is most likely to dance on the table the moment the beat drops?',
   },
   {
+    id: 'mlt-party-4',
+    vibeId: 'party',
+    gameModeId: 'most-likely-to',
+    text: 'Who is most likely to become best friends with the bouncer or bartender within 5 minutes?',
+  },
+
+  // Funny
+  {
     id: 'mlt-funny-1',
     vibeId: 'funny',
     gameModeId: 'most-likely-to',
@@ -162,6 +255,14 @@ export const QUESTIONS: Question[] = [
     gameModeId: 'most-likely-to',
     text: 'Who is most likely to laugh uncontrollably at the most inappropriate serious moment?',
   },
+  {
+    id: 'mlt-funny-3',
+    vibeId: 'funny',
+    gameModeId: 'most-likely-to',
+    text: 'Who is most likely to send a voice note that is 14 minutes long with 90% background noise?',
+  },
+
+  // Chaos
   {
     id: 'mlt-chaos-1',
     vibeId: 'chaos',
@@ -175,6 +276,14 @@ export const QUESTIONS: Question[] = [
     text: 'Who is most likely to impulse dye their hair neon green at 3 AM?',
   },
   {
+    id: 'mlt-chaos-3',
+    vibeId: 'chaos',
+    gameModeId: 'most-likely-to',
+    text: 'Who is most likely to text "Hear me out..." before suggesting the most unhinged plan ever?',
+  },
+
+  // Date
+  {
     id: 'mlt-date-1',
     vibeId: 'date',
     gameModeId: 'most-likely-to',
@@ -185,6 +294,12 @@ export const QUESTIONS: Question[] = [
     vibeId: 'date',
     gameModeId: 'most-likely-to',
     text: 'Who is most likely to fall in love with someone solely based on their Spotify playlist?',
+  },
+  {
+    id: 'mlt-date-3',
+    vibeId: 'date',
+    gameModeId: 'most-likely-to',
+    text: 'Who is most likely to make the bold first romantic move when tension builds?',
   },
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -207,6 +322,14 @@ export const QUESTIONS: Question[] = [
     disagreeLabel: 'DISAGREE',
   },
   {
+    id: 'ht-chaos-3',
+    vibeId: 'chaos',
+    gameModeId: 'hot-take',
+    text: 'Double texting isn’t desperate; it shows confidence and clear communication.',
+    agreeLabel: 'CONFIDENT',
+    disagreeLabel: 'DESPERATE',
+  },
+  {
     id: 'ht-party-1',
     vibeId: 'party',
     gameModeId: 'hot-take',
@@ -219,8 +342,8 @@ export const QUESTIONS: Question[] = [
     vibeId: 'party',
     gameModeId: 'hot-take',
     text: 'People who skip the song after 30 seconds on the aux should permanently lose aux privileges.',
-    agreeLabel: 'AGREE',
-    disagreeLabel: 'DISAGREE',
+    agreeLabel: 'PERMABAN',
+    disagreeLabel: 'LET EM COOK',
   },
   {
     id: 'ht-funny-1',
@@ -285,6 +408,13 @@ export const QUESTIONS: Question[] = [
     text: 'What is the spotlight player’s ideal first date scenario?',
     prompt: 'Group pitches what they think the perfect date is for them.',
   },
+  {
+    id: 'wkmb-date-2',
+    vibeId: 'date',
+    gameModeId: 'who-knows-me-best',
+    text: 'What is the fastest way to win the spotlight player’s affection and trust?',
+    prompt: 'Guess their top love language before they reveal.',
+  },
 
   // ─────────────────────────────────────────────────────────────────────────────
   // 5. OPEN QUESTION
@@ -325,11 +455,25 @@ export const QUESTIONS: Question[] = [
     prompt: 'Share what immediately makes someone 10x more attractive to you.',
   },
   {
+    id: 'open-date-2',
+    vibeId: 'date',
+    gameModeId: 'open-question',
+    text: 'What is a subtle romantic gesture that melts your heart every single time?',
+    prompt: 'Share your honest romantic soft spot.',
+  },
+  {
     id: 'open-deeptalk-1',
     vibeId: 'deep-talk',
     gameModeId: 'open-question',
     text: 'What is one lesson you learned the hard way in the last two years that you are grateful for now?',
     prompt: 'Take your time. Listen without interrupting.',
+  },
+  {
+    id: 'open-deeptalk-2',
+    vibeId: 'deep-talk',
+    gameModeId: 'open-question',
+    text: 'When do you feel most truly like your authentic self, with zero mask or social pressure?',
+    prompt: 'Reflect honestly on who you are when nobody is watching.',
   },
   {
     id: 'open-chill-1',

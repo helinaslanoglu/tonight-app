@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   StyleSheet,
@@ -21,7 +21,7 @@ import { Badge } from '@/components/ui/Badge';
 import { IconButton } from '@/components/ui/IconButton';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { GAME_MODES, VIBES } from '@/data';
-import { validateAnswerForQuestion } from '@/engine';
+import { generateSessionRecap, validateAnswerForQuestion } from '@/engine';
 import {
   useAnswerAndAdvance,
   useCurrentQuestion,
@@ -67,6 +67,12 @@ export default function GameScreen() {
   const activeVibe = VIBES.find((v) => v.id === selectedVibeId);
   const vibeColor = selectedVibeId ? getVibeColor(selectedVibeId) : theme.colors.accent;
   const currentMode = GAME_MODES.find((m) => m.id === currentQuestion?.gameModeId);
+
+  // Generate Recap Insights when session is completed
+  const recap = useMemo(() => {
+    if (!isCompleted) return null;
+    return generateSessionRecap(session);
+  }, [isCompleted, session]);
 
   // Trigger celebration haptic on game completion
   useEffect(() => {
@@ -152,63 +158,93 @@ export default function GameScreen() {
     );
   }
 
-  // ─── Completed Screen State ───────────────────────────────────────────────
-  if (isCompleted) {
+  // ─── Completed Screen State (Rich Recap & Persona Insights) ───────────────
+  if (isCompleted && recap) {
     return (
       <ScreenContainer scrollable contentStyle={styles.container}>
         <View style={styles.navBar}>
-          <Badge label="FINISHED" color={theme.colors.accentMuted} textColor={theme.colors.accent} />
+          <Badge label="NIGHT RECAP" color={theme.colors.accentMuted} textColor={theme.colors.accent} />
+          {activeVibe && (
+            <Badge
+              label={`${activeVibe.emoji} ${activeVibe.label}`}
+              color={theme.colors.surfaceElevated}
+              textColor={vibeColor}
+            />
+          )}
         </View>
 
         <Animated.View entering={FadeIn.duration(400)} style={styles.completedHeader}>
           <AppText variant="display" style={styles.completedTitle}>
-            Tonight&apos;s over.
+            Tonight&apos;s Verdict.
           </AppText>
           <AppText variant="body" color="secondary" style={styles.subtitle}>
-            You crushed all {totalRounds} rounds of chaos.
+            Based on all {totalRounds} rounds of unfiltered answers.
           </AppText>
         </Animated.View>
 
-        {/* Summary Card */}
+        {/* 1. Group / Duo Synergy Card */}
         <Animated.View entering={FadeIn.duration(500)} style={styles.summaryBox}>
-          {activeVibe && (
-            <AppCard variant="elevated" padding="md" style={[styles.summaryCard, { borderColor: vibeColor }]}>
-              <View style={styles.summaryRow}>
-                <AppText style={styles.summaryEmoji}>{activeVibe.emoji}</AppText>
-                <View style={styles.summaryInfo}>
-                  <AppText variant="overline" color="secondary">
-                    VIBE PLAYED
-                  </AppText>
-                  <AppText variant="label" style={{ color: vibeColor }}>
-                    {activeVibe.label}
-                  </AppText>
-                </View>
-                <Badge label={`${totalRounds} ROUNDS`} size="sm" />
-              </View>
-            </AppCard>
-          )}
-
-          <AppCard variant="elevated" padding="lg" style={styles.playersSummaryCard}>
-            <AppText variant="overline" color="secondary" style={styles.playersSummaryTitle}>
-              PLAYERS ({players.length})
+          <AppCard variant="elevated" padding="lg" glow style={[styles.synergyCard, { borderColor: vibeColor }]}>
+            <AppText variant="overline" style={[styles.synergyTag, { color: vibeColor }]}>
+              CHEMISTRY & SYNERGY
             </AppText>
-            <View style={styles.playersWrap}>
-              {players.map((p) => (
-                <View key={p.id} style={styles.playerChip}>
-                  <View style={[styles.playerChipDot, { backgroundColor: p.color || theme.colors.accent }]} />
-                  <AppText variant="label" style={styles.playerChipName}>
-                    {p.name}
-                  </AppText>
-                </View>
-              ))}
+            <AppText variant="heading" style={styles.synergyTitle}>
+              {recap.synergyTitle}
+            </AppText>
+            <AppText variant="body" color="secondary" style={styles.synergySubtitle}>
+              {recap.synergySubtitle}
+            </AppText>
+            <View style={styles.vibeSummaryPill}>
+              <AppText variant="caption" style={styles.vibeSummaryText}>
+                💡 {recap.vibeSummary}
+              </AppText>
             </View>
           </AppCard>
+
+          {/* 2. Player Persona Insights */}
+          <AppText variant="overline" color="secondary" style={styles.sectionHeader}>
+            PLAYER ARCHETYPES & ROASTS
+          </AppText>
+
+          <View style={styles.insightsList}>
+            {recap.playerInsights.map((insight) => {
+              const pColor = insight.playerColor || theme.colors.accent;
+              return (
+                <AppCard
+                  key={insight.playerId}
+                  variant="default"
+                  padding="md"
+                  style={[styles.playerInsightCard, { borderColor: `${pColor}44` }]}
+                >
+                  <View style={styles.insightHeaderRow}>
+                    <View style={[styles.insightAvatar, { backgroundColor: pColor }]}>
+                      <AppText style={styles.avatarInitial}>
+                        {insight.playerName.charAt(0).toUpperCase()}
+                      </AppText>
+                    </View>
+                    <View style={styles.insightNameBox}>
+                      <AppText variant="label" style={styles.playerName}>
+                        {insight.playerName}
+                      </AppText>
+                      <AppText variant="caption" style={{ color: pColor, fontWeight: '700' }}>
+                        {insight.badge}
+                      </AppText>
+                    </View>
+                  </View>
+
+                  <AppText variant="bodySmall" color="secondary" style={styles.roastText}>
+                    &quot;{insight.roastOrCompliment}&quot;
+                  </AppText>
+                </AppCard>
+              );
+            })}
+          </View>
         </Animated.View>
 
         {/* Bottom Actions */}
         <Animated.View entering={FadeIn.duration(600)} style={styles.bottomArea}>
           <AppButton size="lg" fullWidth onPress={handleReplay} style={styles.primaryCta}>
-            PLAY AGAIN
+            PLAY AGAIN (NEW QUESTIONS)
           </AppButton>
           <AppButton
             variant="secondary"
@@ -438,8 +474,8 @@ const styles = StyleSheet.create({
   },
   completedTitle: {
     color: theme.colors.text.primary,
-    fontSize: 44,
-    lineHeight: 48,
+    fontSize: 38,
+    lineHeight: 44,
   },
   subtitle: {
     marginTop: theme.spacing.xs,
@@ -448,53 +484,71 @@ const styles = StyleSheet.create({
     gap: theme.spacing.md,
     marginBottom: theme.spacing.xl,
   },
-  summaryCard: {
+  synergyCard: {
+    borderRadius: theme.radius.xl,
     borderWidth: 1.5,
-    borderRadius: theme.radius.xl,
+    gap: theme.spacing.xs,
   },
-  summaryRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.md,
+  synergyTag: {
+    letterSpacing: 1.2,
   },
-  summaryEmoji: {
-    fontSize: 32,
-    lineHeight: 36,
+  synergyTitle: {
+    fontSize: theme.typography.size.xl,
+    color: theme.colors.text.primary,
   },
-  summaryInfo: {
-    flex: 1,
-    gap: 2,
+  synergySubtitle: {
+    fontSize: theme.typography.size.sm,
+    lineHeight: 20,
   },
-  playersSummaryCard: {
-    borderRadius: theme.radius.xl,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
+  vibeSummaryPill: {
+    backgroundColor: theme.colors.surfaceHighlight,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: theme.radius.md,
+    marginTop: theme.spacing.xs,
   },
-  playersSummaryTitle: {
-    marginBottom: theme.spacing.sm,
+  vibeSummaryText: {
+    color: theme.colors.text.primary,
+    fontSize: theme.typography.size.xs,
   },
-  playersWrap: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+  sectionHeader: {
+    marginTop: theme.spacing.xs,
+    letterSpacing: 1.5,
+  },
+  insightsList: {
     gap: theme.spacing.sm,
   },
-  playerChip: {
+  playerInsightCard: {
+    borderRadius: theme.radius.lg,
+    borderWidth: 1,
+    gap: theme.spacing.xs,
+  },
+  insightHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: theme.spacing.xs,
-    backgroundColor: theme.colors.surface,
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.xs,
-    borderRadius: theme.radius.full,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
+    gap: theme.spacing.sm,
   },
-  playerChipDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+  insightAvatar: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  playerChipName: {
+  avatarInitial: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: theme.typography.weight.bold,
+  },
+  insightNameBox: {
+    flex: 1,
+  },
+  playerName: {
     color: theme.colors.text.primary,
+  },
+  roastText: {
+    fontStyle: 'italic',
+    color: theme.colors.text.secondary,
+    lineHeight: 18,
   },
 });

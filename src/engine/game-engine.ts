@@ -233,18 +233,39 @@ export function advanceSessionRound(
 }
 
 /**
- * Creates a fresh replay session with the same vibe, players, and game mode.
+ * Creates a fresh replay session with the same vibe, players, and game mode,
+ * while preserving question history to avoid repeating previously seen questions.
  */
-export function replaySession(session: GameSession, questionPool: Question[]): GameSession {
+export function replaySession(
+  session: GameSession,
+  questionPool: Question[],
+  carriedUsedQuestionIds?: string[]
+): GameSession {
   if (!session.vibeId || session.players.length < MIN_PLAYERS_REQUIRED) {
     throw new Error('Cannot replay session without existing vibe and players');
   }
 
-  return startNewSession({
-    vibeId: session.vibeId,
-    players: session.players,
-    gameModeId: session.gameModeId || 'all',
-    totalRounds: session.totalRounds,
+  const usedHistory = carriedUsedQuestionIds || session.usedQuestionIds || [];
+  const initialQuestion = selectNextQuestion(
     questionPool,
-  });
+    usedHistory,
+    session.vibeId,
+    session.gameModeId || 'all'
+  );
+  const nextUsedIds = initialQuestion
+    ? [...usedHistory, initialQuestion.id]
+    : usedHistory;
+
+  return {
+    id: generateSessionId(),
+    status: 'playing',
+    vibeId: session.vibeId,
+    gameModeId: session.gameModeId || 'all',
+    players: session.players,
+    currentRound: 1,
+    totalRounds: session.totalRounds || DEFAULT_TOTAL_ROUNDS,
+    currentQuestion: initialQuestion,
+    usedQuestionIds: nextUsedIds,
+    answers: [],
+  };
 }

@@ -2,7 +2,8 @@
  * Local Synthesizer AI Provider
  * ──────────────────────────────
  * Offline-first, high-speed generative synthesis using curated semantic templates.
- * Zero API keys, zero network latency, 100% reliable.
+ * Differentiates seamlessly between 2-Player (Duo Dynamics) and Group Dynamics
+ * with contextual, witty, playful, and natural phrasing.
  */
 
 import type { GameModeId, Question, VibeId } from '@/types';
@@ -19,13 +20,158 @@ interface PersonalizedTemplate {
   disagreeLabel?: string;
 }
 
-const TEMPLATES_BY_VIBE: Record<VibeId, PersonalizedTemplate[]> = {
+// ─── 2-Player (Duo Dynamics) Templates ────────────────────────────────────────
+const DUO_TEMPLATES_BY_VIBE: Record<VibeId, PersonalizedTemplate[]> = {
+  date: [
+    {
+      mode: 'would-you-rather',
+      text: (p1, p2) => `Would you rather let ${p1} plan an impromptu midnight road trip or let ${p2} cook a candlelit dinner?`,
+      optionA: (p1) => `Midnight road trip with ${p1}`,
+      optionB: (_, p2) => `Candlelit dinner by ${p2}`,
+    },
+    {
+      mode: 'hot-take',
+      text: (p1, p2) => `${p1} definitely gets flustered much faster than ${p2} when romantic tension builds.`,
+      agreeLabel: '🔥 100% TRUE',
+      disagreeLabel: '🙈 TOTAL CAP',
+    },
+    {
+      mode: 'most-likely-to',
+      text: (p1, p2) => `Between you two, who is more likely to fall head-over-heels first: ${p1} or ${p2}?`,
+    },
+    {
+      mode: 'who-knows-me-best',
+      text: (p1) => `What is ${p1}'s biggest romantic weakness or soft spot?`,
+      prompt: (_, p2) => `${p2} takes the first guess before the truth is revealed!`,
+    },
+    {
+      mode: 'open-question',
+      text: (p1, p2) => `What was the exact first thought ${p1} had when meeting ${p2}?`,
+      prompt: () => 'Be 100% honest — no holding back.',
+    },
+    {
+      mode: 'would-you-rather',
+      text: () => 'Would you rather have unmatched late-night deep conversations or effortless flirty chemistry?',
+      optionA: () => 'Late-night deep talks',
+      optionB: () => 'Magnetic chemistry',
+    },
+  ],
+  chaos: [
+    {
+      mode: 'would-you-rather',
+      text: (p1, p2) => `Would you rather let ${p1} go through your unlocked camera roll or let ${p2} text your most recent chat?`,
+      optionA: (p1) => `Camera roll to ${p1}`,
+      optionB: (_, p2) => `Last DM to ${p2}`,
+    },
+    {
+      mode: 'hot-take',
+      text: (p1, p2) => `If ${p1} and ${p2} went to Vegas together, they would be banned from at least one venue by midnight.`,
+      agreeLabel: 'GUARANTEED',
+      disagreeLabel: 'NO WAY',
+    },
+    {
+      mode: 'most-likely-to',
+      text: (p1, p2) => `Between you two, who is the real bad influence in this dynamic: ${p1} or ${p2}?`,
+    },
+    {
+      mode: 'open-question',
+      text: (p1, p2) => `If ${p1} and ${p2} were partners in crime, what would your duo codename be?`,
+      prompt: () => 'Agree on your chaotic duo alias.',
+    },
+  ],
+  funny: [
+    {
+      mode: 'would-you-rather',
+      text: (p1, p2) => `Would you rather hear ${p1} give a 10-minute speech on their conspiracy theories or watch ${p2} do standup comedy?`,
+      optionA: (p1) => `${p1}'s conspiracy speech`,
+      optionB: (_, p2) => `${p2}'s standup routine`,
+    },
+    {
+      mode: 'hot-take',
+      text: (p1) => `${p1} definitely checks their reflection in every car window and mirror they pass.`,
+      agreeLabel: 'CAUGHT RED HANDED',
+      disagreeLabel: 'INNOCENT',
+    },
+    {
+      mode: 'most-likely-to',
+      text: (p1, p2) => `Who is more likely to laugh uncontrollably at the worst possible moment: ${p1} or ${p2}?`,
+    },
+    {
+      mode: 'who-knows-me-best',
+      text: (p1) => `What is ${p1}'s weirdest late-night snack combination?`,
+      prompt: (_, p2) => `${p2} guess their midnight guilty pleasure!`,
+    },
+  ],
   party: [
     {
       mode: 'would-you-rather',
-      text: (p1, p2) => `Would you rather let ${p1} DJ the entire night or let ${p2} mix every single drink?`,
+      text: (p1, p2) => `Would you rather let ${p1} control the aux all night or let ${p2} order every round of drinks?`,
+      optionA: (p1) => `${p1} on Aux Control`,
+      optionB: (_, p2) => `${p2} on Drinks Duty`,
+    },
+    {
+      mode: 'hot-take',
+      text: (p1, p2) => `${p1} and ${p2} together on a night out is an unstoppable threat to getting home before 4 AM.`,
+      agreeLabel: 'FACTS',
+      disagreeLabel: 'CAP',
+    },
+    {
+      mode: 'most-likely-to',
+      text: (p1, p2) => `Between you two, who is the first to start dancing on tables: ${p1} or ${p2}?`,
+    },
+    {
+      mode: 'who-knows-me-best',
+      text: (p1) => `What song will guaranteed get ${p1} screaming every single lyric?`,
+      prompt: (p1, p2) => `${p2} guess before ${p1} reveals!`,
+    },
+  ],
+  'deep-talk': [
+    {
+      mode: 'would-you-rather',
+      text: (p1, p2) => `Would you rather trust ${p1} with your deepest secret or trust ${p2} with your emergency bail call?`,
+      optionA: (p1) => `Deepest secret to ${p1}`,
+      optionB: (_, p2) => `Emergency bail to ${p2}`,
+    },
+    {
+      mode: 'open-question',
+      text: (p1, p2) => `What is one quality in ${p2} that ${p1} genuinely admires but rarely says out loud?`,
+      prompt: () => 'Take a moment for genuine appreciation.',
+    },
+    {
+      mode: 'who-knows-me-best',
+      text: (p1) => `What is something ${p1} is deeply passionate about that few people realize?`,
+      prompt: (p1, p2) => `${p2} share what you think ${p1} cares most about.`,
+    },
+  ],
+  chill: [
+    {
+      mode: 'would-you-rather',
+      text: (p1, p2) => `Would you rather spend a cozy rainy Sunday marathon watching movies with ${p1} or playing video games with ${p2}?`,
+      optionA: (p1) => `Movie day with ${p1}`,
+      optionB: (_, p2) => `Gaming day with ${p2}`,
+    },
+    {
+      mode: 'hot-take',
+      text: (p1) => `${p1} spends at least 45 minutes browsing Netflix before falling asleep in the first 10 minutes.`,
+      agreeLabel: '100% ACCURATE',
+      disagreeLabel: 'DEFEND YOURSELF',
+    },
+    {
+      mode: 'open-question',
+      text: (p1, p2) => `What is the ultimate comfort hangout plan that ${p1} and ${p2} would both love?`,
+      prompt: () => 'Design your dream lazy day.',
+    },
+  ],
+};
+
+// ─── Group (3+ Players) Templates ─────────────────────────────────────────────
+const GROUP_TEMPLATES_BY_VIBE: Record<VibeId, PersonalizedTemplate[]> = {
+  party: [
+    {
+      mode: 'would-you-rather',
+      text: (p1, p2) => `Would you rather let ${p1} DJ the entire night or let ${p2} mix every single cocktail?`,
       optionA: (p1) => `${p1} has full AUX control`,
-      optionB: (_, p2) => `${p2} makes all custom cocktails`,
+      optionB: (_, p2) => `${p2} makes custom drinks`,
     },
     {
       mode: 'most-likely-to',
@@ -118,7 +264,7 @@ const TEMPLATES_BY_VIBE: Record<VibeId, PersonalizedTemplate[]> = {
     {
       mode: 'open-question',
       text: (p1) => `What is the biggest romantic green flag that ${p1} brings into relationships?`,
-      prompt: () => `Everyone call out their best genuine quality.`,
+      prompt: () => 'Everyone call out their best genuine quality.',
     },
   ],
   'deep-talk': [
@@ -131,12 +277,12 @@ const TEMPLATES_BY_VIBE: Record<VibeId, PersonalizedTemplate[]> = {
     {
       mode: 'who-knows-me-best',
       text: (p1) => `What is something that ${p1} is deeply passionate about that few people know?`,
-      prompt: (p1) => `Share what you think ${p1} cares most deeply about.`,
+      prompt: (p1) => 'Share what you think they care most deeply about.',
     },
     {
       mode: 'open-question',
       text: (p1) => `What is one trait you deeply respect about ${p1}'s character?`,
-      prompt: () => `Take a moment to give genuine appreciation.`,
+      prompt: () => 'Take a moment to give genuine appreciation.',
     },
   ],
   chill: [
@@ -155,7 +301,7 @@ const TEMPLATES_BY_VIBE: Record<VibeId, PersonalizedTemplate[]> = {
     {
       mode: 'open-question',
       text: (p1) => `If ${p1} was hosting a cozy movie night, what movie are they definitely putting on?`,
-      prompt: () => `Everyone rate their movie taste out of 10.`,
+      prompt: () => 'Everyone rate their movie taste out of 10.',
     },
   ],
 };
@@ -167,7 +313,9 @@ export class LocalSynthesizerProvider implements AIQuestionProvider {
     const { vibeId, players, count = 6 } = params;
     if (!players || players.length < 2) return [];
 
-    const templates = TEMPLATES_BY_VIBE[vibeId] || TEMPLATES_BY_VIBE.party;
+    const isDuo = players.length === 2;
+    const templateSource = isDuo ? DUO_TEMPLATES_BY_VIBE : GROUP_TEMPLATES_BY_VIBE;
+    const templates = templateSource[vibeId] || templateSource.party;
     const questions: Question[] = [];
     const playerNames = players.map((p) => p.name);
 
@@ -177,7 +325,7 @@ export class LocalSynthesizerProvider implements AIQuestionProvider {
       const p2Index = (i + 1) % playerNames.length;
       const p1 = playerNames[p1Index] || 'Player 1';
       const p2 = playerNames[p2Index] || 'Player 2';
-      const groupName = 'the group';
+      const groupName = isDuo ? 'you two' : 'the group';
 
       const qId = `ai-${vibeId}-${generatePlayerId('q')}`;
 

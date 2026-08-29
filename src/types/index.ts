@@ -129,7 +129,25 @@ export interface GameSession {
   answers: RoundAnswer[];
 }
 
-// ─── Game Result / Summary ───────────────────────────────────────────────────
+// ─── Game Result / Summary / Insights ──────────────────────────────────────────
+
+export interface PlayerInsight {
+  playerId: string;
+  playerName: string;
+  playerColor?: string;
+  badge: string;
+  title: string;
+  roastOrCompliment: string;
+  voteCount: number;
+}
+
+export interface SessionRecap {
+  synergyTitle: string;
+  synergySubtitle: string;
+  vibeSummary: string;
+  playerInsights: PlayerInsight[];
+  highlightQuestionText?: string;
+}
 
 export interface GameResult {
   sessionId: string;
@@ -140,4 +158,5 @@ export interface GameResult {
   playerCount: number;
   players: Player[];
   completedAt: string; // ISO timestamp
+  recap?: SessionRecap;
 }
