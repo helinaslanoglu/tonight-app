@@ -25,3 +25,14 @@ export function generateSessionId(): string {
   const randomSuffix = Math.random().toString(36).substring(2, 8);
   return `session_${timestamp}_${randomSuffix}`;
 }
+
+/**
+ * Generate a unique response ID.
+ * Example: `resp_1724856000000_1_a3f9`
+ */
+export function generateResponseId(): string {
+  counter += 1;
+  const timestamp = Date.now().toString(36);
+  const randomSuffix = Math.random().toString(36).substring(2, 7);
+  return `resp_${timestamp}_${counter}_${randomSuffix}`;
+}

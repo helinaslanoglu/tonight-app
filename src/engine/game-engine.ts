@@ -20,6 +20,7 @@ import type {
   Player,
   Question,
   RoundAnswer,
+  SessionType,
   VibeId,
 } from '@/types';
 import { generateSessionId, getQuestionIdentity } from '@/utils';
@@ -193,6 +194,7 @@ export function validateAnswerForQuestion(
 export interface StartSessionParams {
   vibeId: VibeId;
   players: Player[];
+  sessionType?: SessionType;
   gameModeId?: GameModeId | 'all';
   totalRounds?: number;
   questionPool: Question[];
@@ -206,6 +208,7 @@ export interface StartSessionParams {
 export function startNewSession({
   vibeId,
   players,
+  sessionType = 'standard',
   gameModeId = 'all',
   totalRounds = DEFAULT_TOTAL_ROUNDS,
   questionPool,
@@ -226,6 +229,7 @@ export function startNewSession({
 
   return {
     id: generateSessionId(),
+    sessionType,
     status: 'playing',
     vibeId,
     gameModeId,
@@ -235,6 +239,8 @@ export function startNewSession({
     currentQuestion: initialQuestion,
     usedQuestionIds: usedIds,
     answers: [],
+    currentPlayerIndex: 0,
+    responses: [],
   };
 }
 
@@ -317,6 +323,7 @@ export function replaySession(
 
   return {
     id: generateSessionId(),
+    sessionType: session.sessionType || 'standard',
     status: 'playing',
     vibeId: session.vibeId,
     gameModeId: session.gameModeId || 'all',
@@ -326,5 +333,7 @@ export function replaySession(
     currentQuestion: initialQuestion,
     usedQuestionIds: nextUsedIds,
     answers: [],
+    currentPlayerIndex: 0,
+    responses: [],
   };
 }

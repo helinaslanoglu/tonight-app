@@ -16,9 +16,15 @@ import { Badge } from '@/components/ui/Badge';
 import { IconButton } from '@/components/ui/IconButton';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { VIBES } from '@/data';
-import { usePlayers, useSelectedVibe, useSetPlayers } from '@/store';
+import {
+  usePlayers,
+  useSelectedVibe,
+  useSessionType,
+  useSetPlayers,
+  useSetSessionType,
+} from '@/store';
 import { getVibeColor, theme } from '@/theme';
-import type { Player } from '@/types';
+import type { Player, SessionType } from '@/types';
 import { generatePlayerId, haptic } from '@/utils';
 
 const PLAYER_COUNT_OPTIONS = [2, 3, 4, 5, 6] as const;
@@ -36,8 +42,14 @@ const AVATAR_COLORS = [
 export default function GameSetupScreen() {
   const router = useRouter();
   const selectedVibeId = useSelectedVibe();
+  const currentSessionType = useSessionType();
   const existingPlayers = usePlayers();
   const setPlayers = useSetPlayers();
+  const setSessionType = useSetSessionType();
+
+  const [sessionType, setLocalSessionType] = useState<SessionType>(
+    currentSessionType || 'group'
+  );
 
   const activeVibe = VIBES.find((v) => v.id === selectedVibeId);
   const vibeColor = selectedVibeId ? getVibeColor(selectedVibeId) : theme.colors.accent;
@@ -125,6 +137,7 @@ export default function GameSetupScreen() {
     });
 
     setPlayers(playersToSave);
+    setSessionType(sessionType);
     router.push('/game-mode');
   };
 
@@ -157,8 +170,82 @@ export default function GameSetupScreen() {
             Who&apos;s playing?
           </AppText>
           <AppText variant="body" color="secondary" style={styles.subtitle}>
-            Add everyone joining tonight.
+            Add everyone joining tonight and pick your session style.
           </AppText>
+        </Animated.View>
+
+        {/* Session Type Switcher */}
+        <Animated.View entering={FadeIn.duration(420)} style={styles.sessionTypeSection}>
+          <AppText variant="overline" color="secondary" style={styles.sectionLabel}>
+            SESSION TYPE
+          </AppText>
+          <View style={styles.sessionTypeGrid}>
+            <Pressable
+              onPress={() => {
+                haptic.selection().catch(() => {});
+                setLocalSessionType('group');
+              }}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: sessionType === 'group' }}
+              accessibilityLabel="Group Session. Pass the phone so everyone answers secretly."
+              style={({ pressed }) => [
+                styles.sessionTypeCard,
+                sessionType === 'group'
+                  ? [styles.sessionTypeCardSelected, { borderColor: vibeColor }]
+                  : styles.sessionTypeCardUnselected,
+                pressed && styles.cardPressed,
+              ]}
+            >
+              <View style={styles.sessionTypeHeader}>
+                <AppText style={styles.sessionTypeIcon}>👥</AppText>
+                <AppText
+                  variant="label"
+                  style={[
+                    styles.sessionTypeTitle,
+                    sessionType === 'group' && { color: vibeColor },
+                  ]}
+                >
+                  Group Session
+                </AppText>
+              </View>
+              <AppText variant="caption" color="secondary" style={styles.sessionTypeDesc}>
+                Pass the phone. Everyone answers secretly &amp; privately.
+              </AppText>
+            </Pressable>
+
+            <Pressable
+              onPress={() => {
+                haptic.selection().catch(() => {});
+                setLocalSessionType('standard');
+              }}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: sessionType === 'standard' }}
+              accessibilityLabel="Standard Game. Quick party play where the group answers together."
+              style={({ pressed }) => [
+                styles.sessionTypeCard,
+                sessionType === 'standard'
+                  ? [styles.sessionTypeCardSelected, { borderColor: vibeColor }]
+                  : styles.sessionTypeCardUnselected,
+                pressed && styles.cardPressed,
+              ]}
+            >
+              <View style={styles.sessionTypeHeader}>
+                <AppText style={styles.sessionTypeIcon}>⚡</AppText>
+                <AppText
+                  variant="label"
+                  style={[
+                    styles.sessionTypeTitle,
+                    sessionType === 'standard' && { color: vibeColor },
+                  ]}
+                >
+                  Standard Game
+                </AppText>
+              </View>
+              <AppText variant="caption" color="secondary" style={styles.sessionTypeDesc}>
+                Quick party game. Group discusses and answers together.
+              </AppText>
+            </Pressable>
+          </View>
         </Animated.View>
 
         {/* Player Count Selector */}
@@ -274,6 +361,50 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     marginTop: theme.spacing.xs,
+  },
+  sessionTypeSection: {
+    marginBottom: theme.spacing.lg,
+  },
+  sessionTypeGrid: {
+    flexDirection: 'row',
+    gap: theme.spacing.sm,
+  },
+  sessionTypeCard: {
+    flex: 1,
+    padding: theme.spacing.md,
+    borderRadius: theme.radius.lg,
+    borderWidth: 1.5,
+    justifyContent: 'flex-start',
+  },
+  sessionTypeCardUnselected: {
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border,
+  },
+  sessionTypeCardSelected: {
+    backgroundColor: theme.colors.surfaceElevated,
+    ...theme.shadow.glow,
+  },
+  cardPressed: {
+    transform: [{ scale: 0.98 }],
+    opacity: 0.9,
+  },
+  sessionTypeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.xs,
+    marginBottom: theme.spacing.xs,
+  },
+  sessionTypeIcon: {
+    fontSize: 18,
+  },
+  sessionTypeTitle: {
+    fontWeight: theme.typography.weight.bold,
+    fontSize: 14,
+    color: theme.colors.text.primary,
+  },
+  sessionTypeDesc: {
+    fontSize: 11,
+    lineHeight: 15,
   },
   countSection: {
     marginBottom: theme.spacing.lg,

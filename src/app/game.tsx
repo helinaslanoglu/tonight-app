@@ -11,6 +11,7 @@ import {
   HotTakeInteraction,
   MostLikelyToInteraction,
   OpenQuestionInteraction,
+  PassThePhoneOverlay,
   WhoKnowsMeBestInteraction,
   WouldYouRatherInteraction,
 } from '@/components/game';
@@ -21,9 +22,15 @@ import { Badge } from '@/components/ui/Badge';
 import { IconButton } from '@/components/ui/IconButton';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { GAME_MODES, VIBES } from '@/data';
-import { generateSessionRecap, resolveInteractionType, validateAnswerForQuestion } from '@/engine';
+import {
+  aggregateGroupResult,
+  generateSessionRecap,
+  resolveInteractionType,
+} from '@/engine';
 import {
   useAnswerAndAdvance,
+  useCurrentAnsweringPlayer,
+  useCurrentPlayerIndex,
   useCurrentQuestion,
   useCurrentRound,
   useGameSession,
@@ -32,12 +39,15 @@ import {
   useReplayGame,
   useResetSession,
   useSelectedVibe,
+  useSessionType,
+  useSubmitPlayerResponse,
   useTotalRounds,
 } from '@/store';
 import { getVibeColor, theme } from '@/theme';
 import type {
   HotTakeQuestion,
   OpenQuestion,
+  Player,
   WhoKnowsMeBestQuestion,
   WouldYouRatherQuestion,
 } from '@/types';
@@ -46,6 +56,7 @@ import { haptic } from '@/utils';
 export default function GameScreen() {
   const router = useRouter();
   const session = useGameSession();
+  const sessionType = useSessionType();
   const selectedVibeId = useSelectedVibe();
   const players = usePlayers();
   const currentRound = useCurrentRound();
@@ -53,26 +64,40 @@ export default function GameScreen() {
   const currentQuestion = useCurrentQuestion();
   const isCompleted = useIsGameCompleted();
 
+  const currentPlayerIndex = useCurrentPlayerIndex();
+  const currentAnsweringPlayer = useCurrentAnsweringPlayer();
+
   const answerAndAdvance = useAnswerAndAdvance();
+  const submitPlayerResponse = useSubmitPlayerResponse();
   const replayGame = useReplayGame();
   const resetSession = useResetSession();
 
-  // Local selection state for current round
+  // Local selection state for current turn
   const [selectedOption, setSelectedOption] = useState<'A' | 'B' | undefined>(undefined);
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | undefined>(undefined);
   const [selectedStance, setSelectedStance] = useState<'agree' | 'disagree' | undefined>(undefined);
   const [spotlightPlayerId, setSpotlightPlayerId] = useState<string | undefined>(undefined);
   const [isAdvancing, setIsAdvancing] = useState(false);
 
+  // Pass-the-phone privacy overlay state
+  const [passPhoneOverlayVisible, setPassPhoneOverlayVisible] = useState(false);
+  const [nextPlayerForOverlay, setNextPlayerForOverlay] = useState<Player | null>(null);
+
   const activeVibe = VIBES.find((v) => v.id === selectedVibeId);
   const vibeColor = selectedVibeId ? getVibeColor(selectedVibeId) : theme.colors.accent;
   const currentMode = GAME_MODES.find((m) => m.id === currentQuestion?.gameModeId);
 
-  // Generate Recap Insights when session is completed
+  // Generate standard recap insights when standard session is completed
   const recap = useMemo(() => {
-    if (!isCompleted) return null;
+    if (!isCompleted || sessionType === 'group') return null;
     return generateSessionRecap(session);
-  }, [isCompleted, session]);
+  }, [isCompleted, sessionType, session]);
+
+  // Generate Group Results facts when group session is completed
+  const groupResult = useMemo(() => {
+    if (!isCompleted || sessionType !== 'group') return null;
+    return aggregateGroupResult(session);
+  }, [isCompleted, sessionType, session]);
 
   // Trigger celebration haptic on game completion
   useEffect(() => {
@@ -81,31 +106,81 @@ export default function GameScreen() {
     }
   }, [isCompleted]);
 
-  // Validation
-  const canAdvance = validateAnswerForQuestion(currentQuestion, {
-    selectedOption,
-    selectedPlayerId,
-    selectedStance,
-  });
+  // Validation based on interaction type
+  const interactionType = resolveInteractionType(currentQuestion);
+  const canAdvance = useMemo(() => {
+    if (!currentQuestion) return false;
+    switch (interactionType) {
+      case 'choice':
+        return selectedOption === 'A' || selectedOption === 'B';
+      case 'player-select':
+        return typeof selectedPlayerId === 'string' && selectedPlayerId.length > 0;
+      case 'stance':
+        return selectedStance === 'agree' || selectedStance === 'disagree';
+      case 'spotlight-quiz':
+      case 'discussion':
+      default:
+        return true;
+    }
+  }, [currentQuestion, interactionType, selectedOption, selectedPlayerId, selectedStance]);
 
+  // ─── Turn Submission Handler (Standard vs Group) ───────────────────────────
   const handleNext = async () => {
     if (!canAdvance || isAdvancing) return;
 
     haptic.impactMedium().catch(() => {});
     setIsAdvancing(true);
-    await answerAndAdvance({
-      selectedOption,
-      selectedPlayerId,
-      selectedStance,
-      targetPlayerId: spotlightPlayerId,
-    });
 
-    // Reset interaction state for next round
-    setSelectedOption(undefined);
-    setSelectedPlayerId(undefined);
-    setSelectedStance(undefined);
-    setSpotlightPlayerId(undefined);
-    setIsAdvancing(false);
+    if (sessionType === 'group') {
+      // 1. Group Session: Submit individual response
+      let responsePayload: Parameters<typeof submitPlayerResponse>[0];
+
+      if (interactionType === 'choice') {
+        responsePayload = { responseType: 'choice', selectedOption: selectedOption! };
+      } else if (interactionType === 'player-select') {
+        responsePayload = { responseType: 'player-select', selectedPlayerId: selectedPlayerId! };
+      } else if (interactionType === 'stance') {
+        responsePayload = { responseType: 'stance', selectedStance: selectedStance! };
+      } else if (interactionType === 'spotlight-quiz') {
+        responsePayload = { responseType: 'spotlight-quiz', targetPlayerId: spotlightPlayerId };
+      } else {
+        responsePayload = { responseType: 'discussion', confirmed: true };
+      }
+
+      const totalP = players.length;
+      const nextIdx = (currentPlayerIndex + 1) % totalP;
+      const nextP = players[nextIdx];
+
+      // Immediately hide previous answer state to protect privacy
+      setSelectedOption(undefined);
+      setSelectedPlayerId(undefined);
+      setSelectedStance(undefined);
+      setSpotlightPlayerId(undefined);
+
+      const { isQuestionComplete } = await submitPlayerResponse(responsePayload);
+
+      if (!isQuestionComplete || currentRound < totalRounds) {
+        // Show privacy barrier before next player takes device
+        setNextPlayerForOverlay(nextP);
+        setPassPhoneOverlayVisible(true);
+      }
+
+      setIsAdvancing(false);
+    } else {
+      // 2. Standard Game: Submit group summary answer
+      await answerAndAdvance({
+        selectedOption,
+        selectedPlayerId,
+        selectedStance,
+        targetPlayerId: spotlightPlayerId,
+      });
+
+      setSelectedOption(undefined);
+      setSelectedPlayerId(undefined);
+      setSelectedStance(undefined);
+      setSpotlightPlayerId(undefined);
+      setIsAdvancing(false);
+    }
   };
 
   const handleReplay = async () => {
@@ -114,6 +189,7 @@ export default function GameScreen() {
     setSelectedPlayerId(undefined);
     setSelectedStance(undefined);
     setSpotlightPlayerId(undefined);
+    setPassPhoneOverlayVisible(false);
     setIsAdvancing(false);
     await replayGame();
   };
@@ -158,7 +234,158 @@ export default function GameScreen() {
     );
   }
 
-  // ─── Completed Screen State (Rich Recap & Persona Insights) ───────────────
+  // ─── Group Session Completed Screen (Observable Facts & Group Perception) ─
+  if (isCompleted && sessionType === 'group' && groupResult) {
+    return (
+      <ScreenContainer scrollable contentStyle={styles.container}>
+        <View style={styles.navBar}>
+          <Badge label="GROUP PERCEPTION" color={theme.colors.accentMuted} textColor={theme.colors.accent} />
+          {activeVibe && (
+            <Badge
+              label={`${activeVibe.emoji} ${activeVibe.label}`}
+              color={theme.colors.surfaceElevated}
+              textColor={vibeColor}
+            />
+          )}
+        </View>
+
+        <Animated.View entering={FadeIn.duration(400)} style={styles.completedHeader}>
+          <AppText variant="display" style={styles.completedTitle}>
+            Group Results.
+          </AppText>
+          <AppText variant="body" color="secondary" style={styles.subtitle}>
+            Collected {groupResult.totalCollectedResponses} private answers across {players.length} players.
+          </AppText>
+        </Animated.View>
+
+        {/* 1. Most Selected Players Card */}
+        {groupResult.topSelectedPlayers.length > 0 && (
+          <Animated.View entering={FadeIn.duration(500)} style={styles.summaryBox}>
+            <AppCard variant="elevated" padding="lg" glow style={[styles.synergyCard, { borderColor: vibeColor }]}>
+              <AppText variant="overline" style={[styles.synergyTag, { color: vibeColor }]}>
+                MOST SELECTED BY GROUP
+              </AppText>
+              <AppText variant="heading" style={styles.synergyTitle}>
+                👑 {groupResult.topSelectedPlayers[0].name}
+              </AppText>
+              <AppText variant="body" color="secondary" style={styles.synergySubtitle}>
+                Received {groupResult.topSelectedPlayers[0].count} votes from the group.
+              </AppText>
+            </AppCard>
+          </Animated.View>
+        )}
+
+        {/* 2. Individual Selection Patterns & Matrix */}
+        <Animated.View entering={FadeIn.duration(550)} style={styles.summaryBox}>
+          <AppText variant="overline" color="secondary" style={styles.sectionHeader}>
+            WHO SELECTED WHOM
+          </AppText>
+
+          <View style={styles.insightsList}>
+            {players.map((p) => {
+              const stats = groupResult.playerStats[p.id];
+              const selectionsMade = stats?.selectionsMade || {};
+              const targets = Object.entries(selectionsMade).filter(([, count]) => count > 0);
+
+              return (
+                <AppCard
+                  key={p.id}
+                  variant="default"
+                  padding="md"
+                  style={[styles.playerInsightCard, { borderColor: `${p.color || theme.colors.accent}44` }]}
+                >
+                  <View style={styles.insightHeaderRow}>
+                    <View style={[styles.insightAvatar, { backgroundColor: p.color || theme.colors.accent }]}>
+                      <AppText style={styles.avatarInitial}>
+                        {p.name.charAt(0).toUpperCase()}
+                      </AppText>
+                    </View>
+                    <View style={styles.insightNameBox}>
+                      <AppText variant="label" style={styles.playerName}>
+                        {p.name}
+                      </AppText>
+                      <AppText variant="caption" color="secondary">
+                        Received {stats?.timesSelected || 0} votes ({stats?.selectionPercentage || 0}%)
+                      </AppText>
+                    </View>
+                  </View>
+
+                  <View style={styles.patternBox}>
+                    <AppText variant="caption" color="secondary" style={styles.patternLabel}>
+                      Voted for:
+                    </AppText>
+                    {targets.length > 0 ? (
+                      targets.map(([targetId, count]) => {
+                        const targetPlayer = players.find((pl) => pl.id === targetId);
+                        return (
+                          <AppText key={targetId} variant="bodySmall" style={styles.patternRow}>
+                            👉 <AppText style={{ fontWeight: '700' }}>{targetPlayer?.name || 'Unknown'}</AppText> ({count}x)
+                          </AppText>
+                        );
+                      })
+                    ) : (
+                      <AppText variant="caption" color="secondary">
+                        No direct player selections recorded.
+                      </AppText>
+                    )}
+                  </View>
+                </AppCard>
+              );
+            })}
+          </View>
+        </Animated.View>
+
+        {/* 3. Choice & Stance Distributions */}
+        {groupResult.choiceBreakdowns.length > 0 && (
+          <Animated.View entering={FadeIn.duration(600)} style={styles.summaryBox}>
+            <AppText variant="overline" color="secondary" style={styles.sectionHeader}>
+              WOULD YOU RATHER SPLITS
+            </AppText>
+            {groupResult.choiceBreakdowns.map((cb, idx) => (
+              <AppCard key={idx} variant="default" padding="sm" style={styles.distributionCard}>
+                <AppText variant="label" style={styles.distQuestionText}>
+                  {cb.questionText || `Question ${idx + 1}`}
+                </AppText>
+                <View style={styles.distStatsRow}>
+                  <Badge label={`Option A: ${cb.optionACount}`} color={theme.colors.surfaceElevated} />
+                  <Badge label={`Option B: ${cb.optionBCount}`} color={theme.colors.surfaceElevated} />
+                </View>
+              </AppCard>
+            ))}
+          </Animated.View>
+        )}
+
+        {/* Bottom Actions */}
+        <Animated.View entering={FadeIn.duration(650)} style={styles.bottomArea}>
+          <AppButton size="lg" fullWidth onPress={handleReplay} style={styles.primaryCta}>
+            PLAY AGAIN (NEW QUESTIONS)
+          </AppButton>
+          <AppButton
+            variant="secondary"
+            size="md"
+            fullWidth
+            onPress={() => router.push('/game-mode')}
+            style={styles.secondaryCta}
+          >
+            CHANGE MODE
+          </AppButton>
+          <AppButton
+            variant="ghost"
+            size="md"
+            fullWidth
+            onPress={() => {
+              resetSession();
+              router.replace('/');
+            }}
+          >
+            HOME
+          </AppButton>
+        </Animated.View>
+      </ScreenContainer>
+    );
+  }
+
+  // ─── Standard Game Completed Screen State (Persona Insights) ─────────────
   if (isCompleted && recap) {
     return (
       <ScreenContainer scrollable contentStyle={styles.container}>
@@ -273,10 +500,24 @@ export default function GameScreen() {
 
   // ─── Active Playing State ─────────────────────────────────────────────────
   const isLastRound = currentRound >= totalRounds;
+  const isLastPlayer = sessionType === 'group' && currentPlayerIndex >= players.length - 1;
   const progressPercent = Math.min(100, Math.max(10, (currentRound / totalRounds) * 100));
+
+  const activePlayerColor = currentAnsweringPlayer?.color || vibeColor;
 
   return (
     <ScreenContainer scrollable contentStyle={styles.container}>
+      {/* Privacy Barrier Pass The Phone Overlay */}
+      <PassThePhoneOverlay
+        visible={passPhoneOverlayVisible}
+        nextPlayerName={nextPlayerForOverlay?.name || 'Next Player'}
+        nextPlayerColor={nextPlayerForOverlay?.color || vibeColor}
+        onReady={() => {
+          setPassPhoneOverlayVisible(false);
+          setNextPlayerForOverlay(null);
+        }}
+      />
+
       {/* Top Navigation Bar */}
       <View style={styles.navBar}>
         <IconButton
@@ -313,6 +554,24 @@ export default function GameScreen() {
         />
       </View>
 
+      {/* Active Answering Player Banner (Group Session) */}
+      {sessionType === 'group' && currentAnsweringPlayer && (
+        <Animated.View entering={FadeIn.duration(250)} style={styles.playerTurnBanner}>
+          <View style={[styles.playerTurnDot, { backgroundColor: activePlayerColor }]} />
+          <AppText variant="label" style={styles.playerTurnText}>
+            <AppText style={{ color: activePlayerColor, fontWeight: '800' }}>
+              {currentAnsweringPlayer.name.toUpperCase()}
+            </AppText>
+            &apos;S TURN
+          </AppText>
+          <Badge
+            label={`${currentPlayerIndex + 1}/${players.length}`}
+            color={theme.colors.surfaceElevated}
+            textColor={theme.colors.text.secondary}
+          />
+        </Animated.View>
+      )}
+
       {/* Mode Identifier */}
       <Animated.View entering={FadeIn.duration(300)} style={styles.modeRow}>
         <AppText variant="overline" color="secondary" style={styles.modeLabel}>
@@ -335,7 +594,7 @@ export default function GameScreen() {
 
           {/* Single Authoritative Interaction Area */}
           <View style={styles.interactionArea}>
-            {resolveInteractionType(currentQuestion) === 'choice' && (
+            {interactionType === 'choice' && (
               <WouldYouRatherInteraction
                 question={currentQuestion as WouldYouRatherQuestion}
                 selectedOption={selectedOption}
@@ -343,7 +602,7 @@ export default function GameScreen() {
               />
             )}
 
-            {resolveInteractionType(currentQuestion) === 'player-select' && (
+            {interactionType === 'player-select' && (
               <MostLikelyToInteraction
                 players={players}
                 selectedPlayerId={selectedPlayerId}
@@ -351,7 +610,7 @@ export default function GameScreen() {
               />
             )}
 
-            {resolveInteractionType(currentQuestion) === 'stance' && (
+            {interactionType === 'stance' && (
               <HotTakeInteraction
                 question={currentQuestion as HotTakeQuestion}
                 selectedStance={selectedStance}
@@ -359,7 +618,7 @@ export default function GameScreen() {
               />
             )}
 
-            {resolveInteractionType(currentQuestion) === 'spotlight-quiz' && (
+            {interactionType === 'spotlight-quiz' && (
               <WhoKnowsMeBestInteraction
                 question={currentQuestion as WhoKnowsMeBestQuestion}
                 players={players}
@@ -368,7 +627,7 @@ export default function GameScreen() {
               />
             )}
 
-            {resolveInteractionType(currentQuestion) === 'discussion' && (
+            {interactionType === 'discussion' && (
               <OpenQuestionInteraction question={currentQuestion as OpenQuestion} />
             )}
           </View>
@@ -384,7 +643,15 @@ export default function GameScreen() {
           onPress={handleNext}
           style={canAdvance ? styles.primaryCta : undefined}
         >
-          {isLastRound ? 'FINISH GAME' : 'NEXT QUESTION'}
+          {sessionType === 'group'
+            ? isLastRound && isLastPlayer
+              ? 'FINISH GROUP SESSION'
+              : isLastPlayer
+              ? 'NEXT QUESTION'
+              : 'SUBMIT & PASS PHONE'
+            : isLastRound
+            ? 'FINISH GAME'
+            : 'NEXT QUESTION'}
         </AppButton>
       </Animated.View>
     </ScreenContainer>
@@ -429,6 +696,28 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: theme.colors.text.secondary,
     fontWeight: theme.typography.weight.bold,
+  },
+  playerTurnBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: theme.spacing.sm,
+    backgroundColor: theme.colors.surfaceElevated,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
+    borderRadius: theme.radius.full,
+    marginBottom: theme.spacing.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  playerTurnDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  playerTurnText: {
+    fontSize: theme.typography.size.sm,
+    letterSpacing: 1,
   },
   modeRow: {
     alignItems: 'center',
@@ -550,5 +839,33 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     color: theme.colors.text.secondary,
     lineHeight: 18,
+  },
+  patternBox: {
+    marginTop: theme.spacing.xs,
+    backgroundColor: theme.colors.surfaceElevated,
+    padding: theme.spacing.sm,
+    borderRadius: theme.radius.md,
+    gap: 4,
+  },
+  patternLabel: {
+    fontSize: 11,
+    textTransform: 'uppercase',
+    fontWeight: '700',
+  },
+  patternRow: {
+    fontSize: 13,
+    color: theme.colors.text.primary,
+  },
+  distributionCard: {
+    borderRadius: theme.radius.md,
+    gap: theme.spacing.xs,
+    marginBottom: theme.spacing.xs,
+  },
+  distQuestionText: {
+    fontSize: 13,
+  },
+  distStatsRow: {
+    flexDirection: 'row',
+    gap: theme.spacing.sm,
   },
 });

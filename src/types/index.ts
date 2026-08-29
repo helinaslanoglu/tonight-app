@@ -1,6 +1,7 @@
 /**
  * Core domain types for the Tonight app.
- * Strongly typed models for Vibes, Players, Game Modes, Questions, and Sessions.
+ * Strongly typed models for Vibes, Players, Game Modes, Questions, Sessions,
+ * and Multi-Player Group Responses.
  */
 
 // ─── Vibe ─────────────────────────────────────────────────────────────────────
@@ -98,7 +99,7 @@ export type Question =
   | HotTakeQuestion
   | WhoKnowsMeBestQuestion;
 
-// ─── Round Answers ────────────────────────────────────────────────────────────
+// ─── Round Answers (Standard Mode Summary) ────────────────────────────────────
 
 export interface RoundAnswer {
   round: number;
@@ -111,13 +112,74 @@ export interface RoundAnswer {
   timestamp: number;
 }
 
-// ─── Session ──────────────────────────────────────────────────────────────────
+// ─── Individual Player Responses (Group Session Mode) ─────────────────────────
+
+export type ResponseType =
+  | 'choice'
+  | 'player-select'
+  | 'stance'
+  | 'spotlight-quiz'
+  | 'discussion';
+
+export interface BasePlayerResponse {
+  id: string;
+  sessionId: string;
+  questionId: string;
+  playerId: string;
+  responseType: ResponseType;
+  timestamp: number;
+}
+
+export interface ChoiceResponse extends BasePlayerResponse {
+  responseType: 'choice';
+  selectedOption: 'A' | 'B';
+}
+
+export interface PlayerSelectionResponse extends BasePlayerResponse {
+  responseType: 'player-select';
+  selectedPlayerId: string;
+}
+
+export interface StanceResponse extends BasePlayerResponse {
+  responseType: 'stance';
+  selectedStance: 'agree' | 'disagree';
+}
+
+export interface SpotlightResponse extends BasePlayerResponse {
+  responseType: 'spotlight-quiz';
+  targetPlayerId?: string;
+}
+
+export interface DiscussionResponse extends BasePlayerResponse {
+  responseType: 'discussion';
+  confirmed?: boolean;
+}
+
+/**
+ * Strongly-typed discriminated union for all individual player responses in Group Session.
+ */
+export type PlayerResponse =
+  | ChoiceResponse
+  | PlayerSelectionResponse
+  | StanceResponse
+  | SpotlightResponse
+  | DiscussionResponse;
+
+// ─── Session Types ────────────────────────────────────────────────────────────
+
+/**
+ * Session type determines HOW the session collects responses:
+ * - 'standard': Single collective answer/vote per round.
+ * - 'group': Pass-the-phone sequential individual responses from every player.
+ */
+export type SessionType = 'standard' | 'group';
 
 /** Lifecycle state of a game session. */
 export type SessionStatus = 'idle' | 'setup' | 'playing' | 'completed';
 
 export interface GameSession {
   id: string | null;
+  sessionType: SessionType;
   status: SessionStatus;
   vibeId: VibeId | null;
   gameModeId: GameModeId | 'all' | null;
@@ -126,10 +188,15 @@ export interface GameSession {
   totalRounds: number;
   currentQuestion: Question | null;
   usedQuestionIds: string[];
+  /** Summary / legacy answers */
   answers: RoundAnswer[];
+  /** Group Session turn state: active answering player index (0 to players.length - 1) */
+  currentPlayerIndex?: number;
+  /** Group Session raw response store: all individual player responses */
+  responses?: PlayerResponse[];
 }
 
-// ─── Game Result / Summary / Insights ──────────────────────────────────────────
+// ─── Game Result / Summary / Insights (Standard Mode) ─────────────────────────
 
 export interface PlayerInsight {
   playerId: string;
@@ -159,4 +226,51 @@ export interface GameResult {
   players: Player[];
   completedAt: string; // ISO timestamp
   recap?: SessionRecap;
+}
+
+// ─── Group Session Aggregated Results (Deterministic Facts) ───────────────────
+
+export interface PlayerSelectionStats {
+  playerId: string;
+  playerName: string;
+  playerColor?: string;
+  timesSelected: number;
+  selectionPercentage: number;
+  /** Map of fromPlayerId -> count of times they selected this player */
+  selectedBy: Record<string, number>;
+  /** Map of toPlayerId -> count of times this player selected them */
+  selectionsMade: Record<string, number>;
+}
+
+export interface ChoiceBreakdown {
+  questionId: string;
+  questionText: string;
+  optionACount: number;
+  optionBCount: number;
+  playerChoices: Record<string, 'A' | 'B'>;
+}
+
+export interface StanceBreakdown {
+  questionId: string;
+  questionText: string;
+  agreeCount: number;
+  disagreeCount: number;
+  playerStances: Record<string, 'agree' | 'disagree'>;
+}
+
+export interface GroupResult {
+  sessionId: string;
+  vibeId: VibeId;
+  gameModeId: GameModeId | 'all';
+  totalQuestions: number;
+  totalExpectedResponses: number;
+  totalCollectedResponses: number;
+  players: Player[];
+  playerStats: Record<string, PlayerSelectionStats>;
+  topSelectedPlayers: { playerId: string; name: string; count: number }[];
+  choiceBreakdowns: ChoiceBreakdown[];
+  stanceBreakdowns: StanceBreakdown[];
+  /** Full relationship matrix: fromPlayerId -> toPlayerId -> count */
+  relationshipMatrix: Record<string, Record<string, number>>;
+  completedAt: string;
 }

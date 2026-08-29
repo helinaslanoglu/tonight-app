@@ -3,4 +3,5 @@
  */
 export * from './game-engine';
 export * from './interaction-resolver';
+export * from './response-engine';
 export * from './results-engine';

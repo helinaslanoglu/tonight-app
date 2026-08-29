@@ -5,5 +5,6 @@
 export * from './HotTakeInteraction';
 export * from './MostLikelyToInteraction';
 export * from './OpenQuestionInteraction';
+export * from './PassThePhoneOverlay';
 export * from './WhoKnowsMeBestInteraction';
 export * from './WouldYouRatherInteraction';
