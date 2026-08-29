@@ -1,8 +1,13 @@
 /**
  * AI Output Validator & Sanitizer
  * ────────────────────────────────
- * Guarantees that no malformed, empty, or unsafe AI-generated question enters
- * the game engine or UI.
+ * Guarantees that no malformed, empty, or semantically incompatible AI-generated
+ * question enters the game engine or playable question pool.
+ *
+ * Invariants Enforced:
+ * 1. Structural Validation (length, types, non-null).
+ * 2. Semantic Mode Compatibility (e.g. MLT must ask a player-selection question,
+ *    WYR must contain two distinct options).
  */
 
 import type { Question, WouldYouRatherQuestion } from '@/types';
@@ -49,10 +54,14 @@ export function validateAndSanitizeQuestion(raw: unknown): AIValidationResult {
     return { isValid: false, reason: `Invalid vibeId: ${String(q.vibeId)}` };
   }
 
-  // 3. Validate mode-specific fields
+  // 3. Validate mode-specific fields & semantic compatibility
   const mode = q.gameModeId;
-  const id = typeof q.id === 'string' && q.id.length > 0 ? q.id : `ai-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  const id =
+    typeof q.id === 'string' && q.id.length > 0
+      ? q.id
+      : `ai-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 
+  // ─── Would You Rather ────────────────────────────────────────────────────────
   if (mode === 'would-you-rather') {
     const cleanOptionA = sanitizeString(q.optionA);
     const cleanOptionB = sanitizeString(q.optionB);
@@ -79,7 +88,19 @@ export function validateAndSanitizeQuestion(raw: unknown): AIValidationResult {
     return { isValid: true, sanitizedQuestion: sanitizedWYR };
   }
 
+  // ─── Most Likely To ──────────────────────────────────────────────────────────
   if (mode === 'most-likely-to') {
+    // Semantic validation: MLT questions MUST prompt for player selection
+    const hasPlayerSelectionIntent = /\b(who|most likely|who would|who is|who in|between)\b/i.test(
+      cleanText
+    );
+    if (!hasPlayerSelectionIntent) {
+      return {
+        isValid: false,
+        reason: 'Most Likely To questions must prompt for player selection (e.g. starting with "Who is most likely to...")',
+      };
+    }
+
     return {
       isValid: true,
       sanitizedQuestion: {
@@ -91,6 +112,7 @@ export function validateAndSanitizeQuestion(raw: unknown): AIValidationResult {
     };
   }
 
+  // ─── Open Question ───────────────────────────────────────────────────────────
   if (mode === 'open-question') {
     const cleanPrompt = typeof q.prompt === 'string' ? sanitizeString(q.prompt) : undefined;
     return {
@@ -105,9 +127,11 @@ export function validateAndSanitizeQuestion(raw: unknown): AIValidationResult {
     };
   }
 
+  // ─── Hot Take ────────────────────────────────────────────────────────────────
   if (mode === 'hot-take') {
     const cleanAgree = typeof q.agreeLabel === 'string' ? sanitizeString(q.agreeLabel) : undefined;
-    const cleanDisagree = typeof q.disagreeLabel === 'string' ? sanitizeString(q.disagreeLabel) : undefined;
+    const cleanDisagree =
+      typeof q.disagreeLabel === 'string' ? sanitizeString(q.disagreeLabel) : undefined;
     return {
       isValid: true,
       sanitizedQuestion: {
@@ -121,6 +145,7 @@ export function validateAndSanitizeQuestion(raw: unknown): AIValidationResult {
     };
   }
 
+  // ─── Who Knows Me Best ───────────────────────────────────────────────────────
   if (mode === 'who-knows-me-best') {
     const cleanPrompt = typeof q.prompt === 'string' ? sanitizeString(q.prompt) : undefined;
     return {

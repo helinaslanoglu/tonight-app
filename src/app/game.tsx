@@ -21,7 +21,7 @@ import { Badge } from '@/components/ui/Badge';
 import { IconButton } from '@/components/ui/IconButton';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { GAME_MODES, VIBES } from '@/data';
-import { generateSessionRecap, validateAnswerForQuestion } from '@/engine';
+import { generateSessionRecap, resolveInteractionType, validateAnswerForQuestion } from '@/engine';
 import {
   useAnswerAndAdvance,
   useCurrentQuestion,
@@ -333,9 +333,9 @@ export default function GameScreen() {
             </AppText>
           </AppCard>
 
-          {/* Mode-Specific Interaction Area */}
+          {/* Single Authoritative Interaction Area */}
           <View style={styles.interactionArea}>
-            {currentQuestion.gameModeId === 'would-you-rather' && (
+            {resolveInteractionType(currentQuestion) === 'choice' && (
               <WouldYouRatherInteraction
                 question={currentQuestion as WouldYouRatherQuestion}
                 selectedOption={selectedOption}
@@ -343,7 +343,7 @@ export default function GameScreen() {
               />
             )}
 
-            {currentQuestion.gameModeId === 'most-likely-to' && (
+            {resolveInteractionType(currentQuestion) === 'player-select' && (
               <MostLikelyToInteraction
                 players={players}
                 selectedPlayerId={selectedPlayerId}
@@ -351,7 +351,7 @@ export default function GameScreen() {
               />
             )}
 
-            {currentQuestion.gameModeId === 'hot-take' && (
+            {resolveInteractionType(currentQuestion) === 'stance' && (
               <HotTakeInteraction
                 question={currentQuestion as HotTakeQuestion}
                 selectedStance={selectedStance}
@@ -359,7 +359,7 @@ export default function GameScreen() {
               />
             )}
 
-            {currentQuestion.gameModeId === 'who-knows-me-best' && (
+            {resolveInteractionType(currentQuestion) === 'spotlight-quiz' && (
               <WhoKnowsMeBestInteraction
                 question={currentQuestion as WhoKnowsMeBestQuestion}
                 players={players}
@@ -368,7 +368,7 @@ export default function GameScreen() {
               />
             )}
 
-            {currentQuestion.gameModeId === 'open-question' && (
+            {resolveInteractionType(currentQuestion) === 'discussion' && (
               <OpenQuestionInteraction question={currentQuestion as OpenQuestion} />
             )}
           </View>

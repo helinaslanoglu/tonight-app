@@ -2,12 +2,14 @@
  * Local Synthesizer AI Provider
  * ──────────────────────────────
  * Offline-first, high-speed generative synthesis using curated semantic templates.
- * Differentiates seamlessly between 2-Player (Duo Dynamics) and Group Dynamics
- * with contextual, witty, playful, and natural phrasing.
+ * Enforces strict Game Mode filtering and deterministic ID generation.
+ *
+ * Guarantees:
+ * 1. If gameModeId is specified, ONLY templates matching that gameModeId are synthesized.
+ * 2. Deterministic ID generation prevents identical template generations from duplicating.
  */
 
 import type { GameModeId, Question, VibeId } from '@/types';
-import { generatePlayerId } from '@/utils';
 import type { AIGenerationParams, AIQuestionProvider } from '../types';
 
 interface PersonalizedTemplate {
@@ -42,7 +44,7 @@ const DUO_TEMPLATES_BY_VIBE: Record<VibeId, PersonalizedTemplate[]> = {
     {
       mode: 'who-knows-me-best',
       text: (p1) => `What is ${p1}'s biggest romantic weakness or soft spot?`,
-      prompt: (_, p2) => `${p2} takes the first guess before the truth is revealed!`,
+      prompt: (p1, p2) => `${p2} takes the first guess before ${p1} reveals the truth!`,
     },
     {
       mode: 'open-question',
@@ -99,7 +101,7 @@ const DUO_TEMPLATES_BY_VIBE: Record<VibeId, PersonalizedTemplate[]> = {
     {
       mode: 'who-knows-me-best',
       text: (p1) => `What is ${p1}'s weirdest late-night snack combination?`,
-      prompt: (_, p2) => `${p2} guess their midnight guilty pleasure!`,
+      prompt: (p1, p2) => `${p2} guess ${p1}'s midnight guilty pleasure!`,
     },
   ],
   party: [
@@ -310,24 +312,45 @@ export class LocalSynthesizerProvider implements AIQuestionProvider {
   readonly name = 'LocalSynthesizer';
 
   async generateQuestions(params: AIGenerationParams): Promise<Question[]> {
-    const { vibeId, players, count = 6 } = params;
+    const { vibeId, players, gameModeId = 'all', count = 6 } = params;
     if (!players || players.length < 2) return [];
 
     const isDuo = players.length === 2;
     const templateSource = isDuo ? DUO_TEMPLATES_BY_VIBE : GROUP_TEMPLATES_BY_VIBE;
-    const templates = templateSource[vibeId] || templateSource.party;
+    let templates = templateSource[vibeId] || templateSource.party;
+
+    // Filter templates strictly by gameModeId if a specific mode is requested
+    if (gameModeId && gameModeId !== 'all') {
+      const modeFiltered = templates.filter((t) => t.mode === gameModeId);
+      if (modeFiltered.length > 0) {
+        templates = modeFiltered;
+      } else {
+        // If this vibe has no templates for this mode, look in other vibes for the SAME mode
+        const allTemplates = Object.values(templateSource).flat();
+        const fallbackModeTemplates = allTemplates.filter((t) => t.mode === gameModeId);
+        if (fallbackModeTemplates.length > 0) {
+          templates = fallbackModeTemplates;
+        }
+      }
+    }
+
+    if (templates.length === 0) return [];
+
     const questions: Question[] = [];
     const playerNames = players.map((p) => p.name);
+    const sortedPlayerIds = players.map((p) => p.id).sort().join('-');
 
     for (let i = 0; i < count; i++) {
-      const template = templates[i % templates.length];
+      const templateIdx = i % templates.length;
+      const template = templates[templateIdx];
       const p1Index = i % playerNames.length;
       const p2Index = (i + 1) % playerNames.length;
       const p1 = playerNames[p1Index] || 'Player 1';
       const p2 = playerNames[p2Index] || 'Player 2';
       const groupName = isDuo ? 'you two' : 'the group';
 
-      const qId = `ai-${vibeId}-${generatePlayerId('q')}`;
+      // Deterministic question ID ensures identical generations across sessions are caught by deduplicator
+      const qId = `ai-${vibeId}-${template.mode}-${templateIdx}-${sortedPlayerIds}`;
 
       if (template.mode === 'would-you-rather') {
         questions.push({

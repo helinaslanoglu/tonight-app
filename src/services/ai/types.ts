@@ -5,11 +5,12 @@
  * provider adapters, and observability telemetry.
  */
 
-import type { Player, Question, VibeId } from '@/types';
+import type { GameModeId, Player, Question, VibeId } from '@/types';
 
 export interface AIGenerationParams {
   vibeId: VibeId;
   players: Player[];
+  gameModeId?: GameModeId | 'all';
   count?: number;
   existingQuestions?: Question[];
 }

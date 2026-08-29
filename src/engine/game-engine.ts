@@ -4,6 +4,11 @@
  * Pure domain functions for question selection, mode compatibility,
  * session transitions, round progression, and answer validation.
  *
+ * Invariants Enforced:
+ * 1. Strict Game Mode Isolation: If gameModeId !== 'all', questions will NEVER switch modes.
+ * 2. Scoped Question Identity Deduplication: Uses normalized text identity to prevent cross-session repeats.
+ * 3. Controlled In-Mode Cycle: Pool exhaustion resets history strictly within that mode without mode leakage.
+ *
  * This module has ZERO UI dependencies and is 100% unit-testable.
  */
 
@@ -17,7 +22,7 @@ import type {
   RoundAnswer,
   VibeId,
 } from '@/types';
-import { generateSessionId } from '@/utils';
+import { generateSessionId, getQuestionIdentity } from '@/utils';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -64,54 +69,95 @@ export function selectRandomCompatibleGameMode(
 /**
  * Pure function to pick the next unused question for the selected vibe and game mode.
  *
- * Algorithm:
- * 1. Filter question pool by `vibeId` and `gameModeId` (if mode is specified and not 'all').
- * 2. Exclude any question IDs in `usedQuestionIds`.
- * 3. If matching unused questions exist, pick one uniformly at random.
- * 4. Graceful fallback: If specific mode pool is exhausted, try any unused question for that vibe.
- * 5. If vibe pool is exhausted, try unused questions across any vibe.
- * 6. If entire database is exhausted, cycle from the vibe's pool.
+ * Invariants:
+ * 1. If `gameModeId` is a specific mode, NEVER return a question of a different mode.
+ * 2. Exclude questions matched by ID (`usedQuestionIds`) OR scoped identity (`seenIdentities`).
+ * 3. If genuine exhaustion occurs in that specific mode, cycle safely within that mode
+ *    without cross-mode pollution.
  */
 export function selectNextQuestion(
   pool: Question[],
-  usedQuestionIds: string[],
+  usedQuestionIds: string[] = [],
   vibeId: VibeId,
-  gameModeId?: GameModeId | 'all'
+  gameModeId: GameModeId | 'all' = 'all',
+  seenIdentities: string[] | Set<string> = []
 ): Question | null {
   if (!pool || pool.length === 0) return null;
 
   const usedSet = new Set(usedQuestionIds);
+  const seenSet = seenIdentities instanceof Set ? seenIdentities : new Set(seenIdentities);
 
-  // 1. Filter by vibe AND mode if specified
-  const matchesMode = (q: Question) =>
-    !gameModeId || gameModeId === 'all' || q.gameModeId === gameModeId;
+  const isUnseen = (q: Question) => {
+    if (usedSet.has(q.id)) return false;
+    const identity = getQuestionIdentity(q);
+    if (seenSet.has(identity)) return false;
+    return true;
+  };
 
-  const exactUnused = pool.filter(
-    (q) => q.vibeId === vibeId && matchesMode(q) && !usedSet.has(q.id)
-  );
-  if (exactUnused.length > 0) {
-    return exactUnused[Math.floor(Math.random() * exactUnused.length)];
+  // ─── Case 1: Specific Explicit Mode (Strict Mode Invariant) ───────────────────
+  if (gameModeId && gameModeId !== 'all') {
+    const modePool = pool.filter(
+      (q) => q.vibeId === vibeId && q.gameModeId === gameModeId
+    );
+
+    if (modePool.length > 0) {
+      // 1a. Unseen questions matching vibe + mode
+      const unusedInMode = modePool.filter(isUnseen);
+      if (unusedInMode.length > 0) {
+        return unusedInMode[Math.floor(Math.random() * unusedInMode.length)];
+      }
+
+      // 1b. Controlled In-Mode Cycle: Pool for this specific mode is exhausted.
+      // Pick from the mode pool, avoiding immediate in-session duplicates if possible
+      const sessionUnused = modePool.filter((q) => !usedSet.has(q.id));
+      if (sessionUnused.length > 0) {
+        return sessionUnused[Math.floor(Math.random() * sessionUnused.length)];
+      }
+
+      // 1c. Full mode pool reset (avoid undefined/crash, stay strictly in mode)
+      return modePool[Math.floor(Math.random() * modePool.length)];
+    }
+
+    // If pool has no questions for this vibe + mode, look across other vibes for THIS SAME MODE
+    const sameModeAnyVibe = pool.filter((q) => q.gameModeId === gameModeId);
+    if (sameModeAnyVibe.length > 0) {
+      const unseenSameMode = sameModeAnyVibe.filter(isUnseen);
+      if (unseenSameMode.length > 0) {
+        return unseenSameMode[Math.floor(Math.random() * unseenSameMode.length)];
+      }
+      return sameModeAnyVibe[Math.floor(Math.random() * sameModeAnyVibe.length)];
+    }
+
+    // Ultimate fallback if no questions exist in this mode at all
+    return pool[Math.floor(Math.random() * pool.length)];
   }
 
-  // 2. Unused questions for this vibe (any mode)
-  const vibeUnused = pool.filter((q) => q.vibeId === vibeId && !usedSet.has(q.id));
-  if (vibeUnused.length > 0) {
-    return vibeUnused[Math.floor(Math.random() * vibeUnused.length)];
+  // ─── Case 2: Surprise Me / Mixed Modes (gameModeId === 'all') ─────────────────
+  const vibePool = pool.filter((q) => q.vibeId === vibeId);
+
+  if (vibePool.length > 0) {
+    // 2a. Unseen questions for this vibe (across any mode)
+    const unseenVibe = vibePool.filter(isUnseen);
+    if (unseenVibe.length > 0) {
+      return unseenVibe[Math.floor(Math.random() * unseenVibe.length)];
+    }
+
+    // 2b. In-session unused questions for this vibe
+    const sessionUnused = vibePool.filter((q) => !usedSet.has(q.id));
+    if (sessionUnused.length > 0) {
+      return sessionUnused[Math.floor(Math.random() * sessionUnused.length)];
+    }
+
+    // 2c. Cycle within vibe
+    return vibePool[Math.floor(Math.random() * vibePool.length)];
   }
 
-  // 3. Unused questions across any vibe (graceful fallback)
-  const anyUnused = pool.filter((q) => !usedSet.has(q.id));
-  if (anyUnused.length > 0) {
-    return anyUnused[Math.floor(Math.random() * anyUnused.length)];
+  // 2d. Global unseen fallback
+  const globalUnseen = pool.filter(isUnseen);
+  if (globalUnseen.length > 0) {
+    return globalUnseen[Math.floor(Math.random() * globalUnseen.length)];
   }
 
-  // 4. Complete exhaustion fallback: pick any question from the selected vibe & mode
-  const allVibeQuestions = pool.filter((q) => q.vibeId === vibeId);
-  if (allVibeQuestions.length > 0) {
-    return allVibeQuestions[Math.floor(Math.random() * allVibeQuestions.length)];
-  }
-
-  // 5. Ultimate fallback
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
@@ -150,10 +196,12 @@ export interface StartSessionParams {
   gameModeId?: GameModeId | 'all';
   totalRounds?: number;
   questionPool: Question[];
+  seenIdentities?: string[];
 }
 
 /**
  * Starts a fresh game session with round 1 and the first question.
+ * Preserves cross-session history to prevent repeating seen questions in round 1.
  */
 export function startNewSession({
   vibeId,
@@ -161,12 +209,19 @@ export function startNewSession({
   gameModeId = 'all',
   totalRounds = DEFAULT_TOTAL_ROUNDS,
   questionPool,
+  seenIdentities = [],
 }: StartSessionParams): GameSession {
   if (!vibeId || players.length < MIN_PLAYERS_REQUIRED) {
     throw new Error('Cannot start session without a valid vibe and minimum 2 players');
   }
 
-  const initialQuestion = selectNextQuestion(questionPool, [], vibeId, gameModeId);
+  const initialQuestion = selectNextQuestion(
+    questionPool,
+    [],
+    vibeId,
+    gameModeId,
+    seenIdentities
+  );
   const usedIds = initialQuestion ? [initialQuestion.id] : [];
 
   return {
@@ -191,7 +246,8 @@ export function startNewSession({
 export function advanceSessionRound(
   session: GameSession,
   answer: RoundAnswer | undefined,
-  questionPool: Question[]
+  questionPool: Question[],
+  seenIdentities: string[] = []
 ): GameSession {
   if (session.status !== 'playing') {
     return session;
@@ -215,7 +271,8 @@ export function advanceSessionRound(
         questionPool,
         session.usedQuestionIds,
         session.vibeId,
-        session.gameModeId || 'all'
+        session.gameModeId || 'all',
+        seenIdentities
       )
     : null;
 
@@ -239,7 +296,8 @@ export function advanceSessionRound(
 export function replaySession(
   session: GameSession,
   questionPool: Question[],
-  carriedUsedQuestionIds?: string[]
+  carriedUsedQuestionIds?: string[],
+  seenIdentities?: string[]
 ): GameSession {
   if (!session.vibeId || session.players.length < MIN_PLAYERS_REQUIRED) {
     throw new Error('Cannot replay session without existing vibe and players');
@@ -250,7 +308,8 @@ export function replaySession(
     questionPool,
     usedHistory,
     session.vibeId,
-    session.gameModeId || 'all'
+    session.gameModeId || 'all',
+    seenIdentities || []
   );
   const nextUsedIds = initialQuestion
     ? [...usedHistory, initialQuestion.id]

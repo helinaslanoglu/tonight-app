@@ -31,6 +31,7 @@ export interface ContentProvider {
   getPersonalizedQuestions: (params: {
     vibeId: VibeId;
     players: Player[];
+    gameModeId?: GameModeId | 'all';
     count?: number;
   }) => Promise<Question[]>;
 }
@@ -65,8 +66,8 @@ export const defaultContentProvider: ContentProvider = {
     return result;
   },
 
-  getPersonalizedQuestions: async ({ vibeId, players, count = 6 }) => {
-    return generatePersonalizedQuestions({ vibeId, players, count });
+  getPersonalizedQuestions: async ({ vibeId, players, gameModeId = 'all', count = 6 }) => {
+    return generatePersonalizedQuestions({ vibeId, players, gameModeId, count });
   },
 };
 
@@ -87,6 +88,7 @@ export async function fetchQuestions(filter?: ContentFilter): Promise<Question[]
 export async function fetchPersonalizedQuestions(params: {
   vibeId: VibeId;
   players: Player[];
+  gameModeId?: GameModeId | 'all';
   count?: number;
 }): Promise<Question[]> {
   return defaultContentProvider.getPersonalizedQuestions(params);

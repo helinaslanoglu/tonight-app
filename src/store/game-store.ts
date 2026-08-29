@@ -16,6 +16,7 @@ import type {
   SessionStatus,
   VibeId,
 } from '@/types';
+import { getQuestionIdentity } from '@/utils';
 
 // ─── Initial State ────────────────────────────────────────────────────────────
 
@@ -37,6 +38,8 @@ const INITIAL_SESSION: GameSession = {
 interface GameState {
   session: GameSession;
   questionPool: Question[];
+  /** App-scoped sliding window of seen question identities to prevent cross-session repeats */
+  seenQuestionIdentities: string[];
 }
 
 interface GameActions {
@@ -58,11 +61,14 @@ interface GameActions {
   /** Submits an answer for the current round and advances to the next question */
   submitAnswerAndAdvance: (partialAnswer?: Partial<RoundAnswer>) => Promise<void>;
 
-  /** Replays the game with the same vibe and players */
+  /** Replays the game with the same vibe and players while avoiding seen questions */
   replayGame: () => Promise<void>;
 
-  /** Resets session to initial idle state */
+  /** Resets session to initial idle state (preserves cross-session question history) */
   resetSession: () => void;
+
+  /** Clears historical seen question memory */
+  clearQuestionHistory: () => void;
 }
 
 // ─── Store Definition ─────────────────────────────────────────────────────────
@@ -70,6 +76,7 @@ interface GameActions {
 export const useGameStore = create<GameState & GameActions>((set, get) => ({
   session: INITIAL_SESSION,
   questionPool: [],
+  seenQuestionIdentities: [],
 
   setVibe: (vibeId) =>
     set((state) => ({
@@ -92,28 +99,44 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     })),
 
   startGame: async () => {
-    const { session } = get();
+    const { session, seenQuestionIdentities } = get();
     if (!session.vibeId || session.players.length < 2) {
       return;
     }
 
-    // 1. Instant launch with static curated questions
+    const selectedMode = session.gameModeId || 'all';
+
+    // 1. Instant launch with static curated questions + cross-session history
     const staticQuestions = await defaultContentProvider.getQuestions();
     const newSession = startNewSession({
       vibeId: session.vibeId,
       players: session.players,
-      gameModeId: session.gameModeId || 'all',
+      gameModeId: selectedMode,
       totalRounds: session.totalRounds || DEFAULT_TOTAL_ROUNDS,
       questionPool: staticQuestions,
+      seenIdentities: seenQuestionIdentities,
     });
 
-    set({ session: newSession, questionPool: staticQuestions });
+    const updatedIdentities = newSession.currentQuestion
+      ? [...seenQuestionIdentities, getQuestionIdentity(newSession.currentQuestion)]
+      : seenQuestionIdentities;
 
-    // 2. Asynchronous background AI question synthesis
+    set({
+      session: newSession,
+      questionPool: staticQuestions,
+      seenQuestionIdentities: updatedIdentities,
+    });
+
+    // 2. Asynchronous background AI question synthesis (Mode-Aware)
     const vibeId = session.vibeId;
     const players = session.players;
     defaultContentProvider
-      .getPersonalizedQuestions({ vibeId, players, count: 8 })
+      .getPersonalizedQuestions({
+        vibeId,
+        players,
+        gameModeId: selectedMode,
+        count: 8,
+      })
       .then((aiQuestions) => {
         if (aiQuestions.length > 0) {
           set((state) => ({
@@ -127,7 +150,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
   },
 
   submitAnswerAndAdvance: async (partialAnswer) => {
-    const { session, questionPool } = get();
+    const { session, questionPool, seenQuestionIdentities } = get();
     if (session.status !== 'playing' || !session.currentQuestion) {
       return;
     }
@@ -145,27 +168,58 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
 
     const pool =
       questionPool.length > 0 ? questionPool : await defaultContentProvider.getQuestions();
-    const advancedSession = advanceSessionRound(session, answer, pool);
+    const advancedSession = advanceSessionRound(
+      session,
+      answer,
+      pool,
+      seenQuestionIdentities
+    );
 
-    set({ session: advancedSession });
+    const nextIdentities = advancedSession.currentQuestion
+      ? [...seenQuestionIdentities, getQuestionIdentity(advancedSession.currentQuestion)]
+      : seenQuestionIdentities;
+
+    set({
+      session: advancedSession,
+      seenQuestionIdentities: nextIdentities,
+    });
   },
 
   replayGame: async () => {
-    const { session } = get();
+    const { session, seenQuestionIdentities } = get();
     if (!session.vibeId || session.players.length < 2) {
       return;
     }
 
+    const selectedMode = session.gameModeId || 'all';
     const staticQuestions = await defaultContentProvider.getQuestions();
-    const replayedSession = replaySession(session, staticQuestions, session.usedQuestionIds);
+    const replayedSession = replaySession(
+      session,
+      staticQuestions,
+      session.usedQuestionIds,
+      seenQuestionIdentities
+    );
 
-    set({ session: replayedSession, questionPool: staticQuestions });
+    const updatedIdentities = replayedSession.currentQuestion
+      ? [...seenQuestionIdentities, getQuestionIdentity(replayedSession.currentQuestion)]
+      : seenQuestionIdentities;
 
-    // Background prefetch for new replay session
+    set({
+      session: replayedSession,
+      questionPool: staticQuestions,
+      seenQuestionIdentities: updatedIdentities,
+    });
+
+    // Background prefetch for new replay session (Mode-Aware)
     const vibeId = session.vibeId;
     const players = session.players;
     defaultContentProvider
-      .getPersonalizedQuestions({ vibeId, players, count: 8 })
+      .getPersonalizedQuestions({
+        vibeId,
+        players,
+        gameModeId: selectedMode,
+        count: 8,
+      })
       .then((aiQuestions) => {
         if (aiQuestions.length > 0) {
           set((state) => ({
@@ -177,7 +231,15 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
   },
 
   resetSession: () =>
-    set({ session: { ...INITIAL_SESSION }, questionPool: [] }),
+    set((state) => ({
+      session: { ...INITIAL_SESSION },
+      questionPool: [],
+      // Preserve seenQuestionIdentities across navigation/restarts
+      seenQuestionIdentities: state.seenQuestionIdentities,
+    })),
+
+  clearQuestionHistory: () =>
+    set({ seenQuestionIdentities: [] }),
 }));
 
 // ─── Atomic Selector Hooks (100% stable references) ───────────────────────────
@@ -191,6 +253,8 @@ export const useCurrentRound = () => useGameStore((s) => s.session.currentRound)
 export const useTotalRounds = () => useGameStore((s) => s.session.totalRounds);
 export const useCurrentQuestion = () => useGameStore((s) => s.session.currentQuestion);
 export const useIsGameCompleted = () => useGameStore((s) => s.session.status === 'completed');
+export const useSeenQuestionIdentities = () =>
+  useGameStore((s) => s.seenQuestionIdentities);
 
 // Action hooks with stable references
 export const useSetVibe = () => useGameStore((s) => s.setVibe);
@@ -200,3 +264,4 @@ export const useStartGame = () => useGameStore((s) => s.startGame);
 export const useAnswerAndAdvance = () => useGameStore((s) => s.submitAnswerAndAdvance);
 export const useReplayGame = () => useGameStore((s) => s.replayGame);
 export const useResetSession = () => useGameStore((s) => s.resetSession);
+export const useClearQuestionHistory = () => useGameStore((s) => s.clearQuestionHistory);
