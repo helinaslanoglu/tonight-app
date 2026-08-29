@@ -1,23 +1,40 @@
 import { generatePersonalizedQuestions } from '@/services/ai';
-import type { GameMode, GameModeId, Player, Question, Vibe, VibeId } from '@/types';
+import type {
+  GameMode,
+  GameModeId,
+  LanguageId,
+  Player,
+  Question,
+  Vibe,
+  VibeId,
+} from '@/types';
 
 import { GAME_MODES } from './game-modes';
-import { QUESTIONS } from './questions';
+import { getQuestionsByLanguage } from './questions';
 import { VIBES } from './vibes';
 
 export { GAME_MODES, getCompatibleGameModes, getGameModeById } from './game-modes';
-export { QUESTIONS } from './questions';
+export {
+  ARABIC_QUESTIONS,
+  ENGLISH_QUESTIONS,
+  FRENCH_QUESTIONS,
+  getQuestionsByLanguage,
+  QUESTIONS,
+  QUESTIONS_BY_LANGUAGE,
+  TURKISH_QUESTIONS,
+} from './questions';
 export { VIBES } from './vibes';
 
 /**
  * Data Access Layer (Hybrid Content Provider)
  * ───────────────────────────────────────────
  * Decouples the UI and game engine from content sources.
- * Combines high-quality curated static questions with dynamic,
- * background-synthesized AI questions referencing the active players.
+ * Combines high-quality curated localized static questions with dynamic,
+ * background-synthesized AI questions referencing the active players and language.
  */
 
 export interface ContentFilter {
+  language?: LanguageId;
   vibeId?: VibeId;
   gameModeId?: GameModeId;
   players?: Player[];
@@ -29,6 +46,7 @@ export interface ContentProvider {
   getGameModes: () => Promise<GameMode[]>;
   getQuestions: (filter?: ContentFilter) => Promise<Question[]>;
   getPersonalizedQuestions: (params: {
+    language?: LanguageId;
     vibeId: VibeId;
     players: Player[];
     gameModeId?: GameModeId | 'all';
@@ -37,7 +55,7 @@ export interface ContentProvider {
 }
 
 /**
- * Hybrid content provider combining instant static questions with AI personalization.
+ * Hybrid content provider combining instant localized questions with AI personalization.
  */
 export const defaultContentProvider: ContentProvider = {
   getVibes: async (): Promise<Vibe[]> => {
@@ -49,7 +67,8 @@ export const defaultContentProvider: ContentProvider = {
   },
 
   getQuestions: async (filter?: ContentFilter): Promise<Question[]> => {
-    let result = [...QUESTIONS];
+    const rawQuestions = getQuestionsByLanguage(filter?.language || 'en');
+    let result = [...rawQuestions];
 
     if (filter?.vibeId) {
       result = result.filter((q) => q.vibeId === filter.vibeId);
@@ -66,8 +85,14 @@ export const defaultContentProvider: ContentProvider = {
     return result;
   },
 
-  getPersonalizedQuestions: async ({ vibeId, players, gameModeId = 'all', count = 6 }) => {
-    return generatePersonalizedQuestions({ vibeId, players, gameModeId, count });
+  getPersonalizedQuestions: async ({
+    language = 'en',
+    vibeId,
+    players,
+    gameModeId = 'all',
+    count = 6,
+  }) => {
+    return generatePersonalizedQuestions({ language, vibeId, players, gameModeId, count });
   },
 };
 
@@ -86,6 +111,7 @@ export async function fetchQuestions(filter?: ContentFilter): Promise<Question[]
 }
 
 export async function fetchPersonalizedQuestions(params: {
+  language?: LanguageId;
   vibeId: VibeId;
   players: Player[];
   gameModeId?: GameModeId | 'all';

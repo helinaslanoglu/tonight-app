@@ -15,6 +15,8 @@ import { AppButton } from '@/components/ui/AppButton';
 import { AppCard } from '@/components/ui/AppCard';
 import { AppText } from '@/components/ui/AppText';
 import { Badge } from '@/components/ui/Badge';
+import { isRTL, t } from '@/services/i18n';
+import { useLanguage } from '@/store';
 import { theme } from '@/theme';
 import { haptic } from '@/utils';
 
@@ -31,6 +33,9 @@ export const PassThePhoneOverlay: React.FC<PassThePhoneOverlayProps> = ({
   nextPlayerColor = theme.colors.accent,
   onReady,
 }) => {
+  const language = useLanguage();
+  const rtl = isRTL(language);
+
   if (!visible) return null;
 
   const handleReadyPress = () => {
@@ -53,21 +58,25 @@ export const PassThePhoneOverlay: React.FC<PassThePhoneOverlayProps> = ({
           </View>
 
           <Badge
-            label="PASS THE PHONE"
+            label={t('sessionType.passPhone.title', language).toUpperCase()}
             color={theme.colors.surfaceElevated}
             textColor={nextPlayerColor}
             style={styles.badge}
           />
 
-          <AppText variant="heading" style={styles.title}>
-            Hand the device to{'\n'}
-            <AppText style={[styles.nameHighlight, { color: nextPlayerColor }]}>
-              {nextPlayerName}
-            </AppText>
+          <AppText
+            variant="heading"
+            style={[styles.title, rtl && styles.textRTL]}
+          >
+            {t('passPhone.handoverTitle', language, { target: nextPlayerName })}
           </AppText>
 
-          <AppText variant="body" color="secondary" style={styles.subtitle}>
-            Keep all answers secret!{'\n'}Take your time and answer honestly. 🔒
+          <AppText
+            variant="body"
+            color="secondary"
+            style={[styles.subtitle, rtl && styles.textRTL]}
+          >
+            {t('passPhone.handoverSubtitle', language)}
           </AppText>
 
           <View style={styles.buttonWrapper}>
@@ -77,8 +86,9 @@ export const PassThePhoneOverlay: React.FC<PassThePhoneOverlayProps> = ({
               fullWidth
               onPress={handleReadyPress}
               accessibilityLabel={`I am ready, ${nextPlayerName}`}
+              style={{ backgroundColor: nextPlayerColor }}
             >
-              {`I'M READY, ${nextPlayerName.toUpperCase()}`}
+              {t('passPhone.readyButton', language, { target: nextPlayerName })}
             </AppButton>
           </View>
         </AppCard>
@@ -127,18 +137,18 @@ const styles = StyleSheet.create({
   },
   title: {
     textAlign: 'center',
-    fontSize: 24,
-    lineHeight: 32,
+    fontSize: 22,
+    lineHeight: 30,
     marginBottom: theme.spacing.sm,
-  },
-  nameHighlight: {
-    fontWeight: '800',
   },
   subtitle: {
     textAlign: 'center',
     fontSize: 15,
     lineHeight: 22,
     marginBottom: theme.spacing.xl,
+  },
+  textRTL: {
+    writingDirection: 'rtl',
   },
   buttonWrapper: {
     width: '100%',

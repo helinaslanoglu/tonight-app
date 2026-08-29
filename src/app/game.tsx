@@ -2,6 +2,7 @@ import { useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
+  Pressable,
   StyleSheet,
   View,
 } from 'react-native';
@@ -24,21 +25,32 @@ import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { GAME_MODES, VIBES } from '@/data';
 import {
   aggregateGroupResult,
+  aggregatePassPhoneResult,
   generateSessionRecap,
+  getValidTargetsForSelector,
   resolveInteractionType,
 } from '@/engine';
+import { isRTL, t } from '@/services/i18n';
 import {
+  useAcknowledgePassPhoneReveal,
   useAnswerAndAdvance,
+  useCommitPassPhoneAction,
+  useConfirmPassPhoneHandover,
   useCurrentAnsweringPlayer,
   useCurrentPlayerIndex,
   useCurrentQuestion,
   useCurrentRound,
   useGameSession,
   useIsGameCompleted,
+  useLanguage,
+  usePassPhonePhase,
+  usePassPhoneSelector,
+  usePassPhoneTarget,
   usePlayers,
   useReplayGame,
   useResetSession,
   useSelectedVibe,
+  useSelectPassPhoneTarget,
   useSessionType,
   useSubmitPlayerResponse,
   useTotalRounds,
@@ -56,6 +68,8 @@ import { haptic } from '@/utils';
 export default function GameScreen() {
   const router = useRouter();
   const session = useGameSession();
+  const language = useLanguage();
+  const rtl = isRTL(language);
   const sessionType = useSessionType();
   const selectedVibeId = useSelectedVibe();
   const players = usePlayers();
@@ -64,144 +78,169 @@ export default function GameScreen() {
   const currentQuestion = useCurrentQuestion();
   const isCompleted = useIsGameCompleted();
 
+  // Group Session state hooks
   const currentPlayerIndex = useCurrentPlayerIndex();
   const currentAnsweringPlayer = useCurrentAnsweringPlayer();
 
+  // Pass The Phone state hooks
+  const passPhonePhase = usePassPhonePhase();
+  const passPhoneSelector = usePassPhoneSelector();
+  const passPhoneTarget = usePassPhoneTarget();
+
+  // Actions
   const answerAndAdvance = useAnswerAndAdvance();
   const submitPlayerResponse = useSubmitPlayerResponse();
+  const selectPassPhoneTarget = useSelectPassPhoneTarget();
+  const confirmPassPhoneHandover = useConfirmPassPhoneHandover();
+  const commitPassPhoneAction = useCommitPassPhoneAction();
+  const acknowledgePassPhoneReveal = useAcknowledgePassPhoneReveal();
   const replayGame = useReplayGame();
   const resetSession = useResetSession();
 
-  // Local selection state for current turn
+  // Local selection state for current turn (Group & Standard modes)
   const [selectedOption, setSelectedOption] = useState<'A' | 'B' | undefined>(undefined);
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | undefined>(undefined);
   const [selectedStance, setSelectedStance] = useState<'agree' | 'disagree' | undefined>(undefined);
   const [spotlightPlayerId, setSpotlightPlayerId] = useState<string | undefined>(undefined);
-  const [isAdvancing, setIsAdvancing] = useState(false);
 
-  // Pass-the-phone privacy overlay state
+  // Local Pass The Phone privacy overlay state
   const [passPhoneOverlayVisible, setPassPhoneOverlayVisible] = useState(false);
   const [nextPlayerForOverlay, setNextPlayerForOverlay] = useState<Player | null>(null);
 
+  // Transition state
+  const [isAdvancing, setIsAdvancing] = useState(false);
+
   const activeVibe = VIBES.find((v) => v.id === selectedVibeId);
   const vibeColor = selectedVibeId ? getVibeColor(selectedVibeId) : theme.colors.accent;
-  const currentMode = GAME_MODES.find((m) => m.id === currentQuestion?.gameModeId);
 
-  // Generate standard recap insights when standard session is completed
+  const currentMode = useMemo(() => {
+    if (!currentQuestion) return null;
+    return GAME_MODES.find((m) => m.id === currentQuestion.gameModeId) || null;
+  }, [currentQuestion]);
+
+  const interactionType = useMemo(() => {
+    if (!currentQuestion) return 'choice';
+    return resolveInteractionType(currentQuestion);
+  }, [currentQuestion]);
+
+  // Compute Standard Mode Recap
   const recap = useMemo(() => {
-    if (!isCompleted || sessionType === 'group') return null;
+    if (!isCompleted || !session.answers || session.answers.length === 0) return null;
     return generateSessionRecap(session);
-  }, [isCompleted, sessionType, session]);
+  }, [isCompleted, session]);
 
-  // Generate Group Results facts when group session is completed
+  // Compute Group Session Aggregated Results
   const groupResult = useMemo(() => {
-    if (!isCompleted || sessionType !== 'group') return null;
+    if (!isCompleted || sessionType !== 'group' || !session.responses || session.responses.length === 0) {
+      return null;
+    }
     return aggregateGroupResult(session);
   }, [isCompleted, sessionType, session]);
 
-  // Trigger celebration haptic on game completion
-  useEffect(() => {
-    if (isCompleted) {
-      haptic.success().catch(() => {});
+  // Compute Pass The Phone Aggregated Results
+  const passPhoneResult = useMemo(() => {
+    if (!isCompleted || sessionType !== 'pass-the-phone' || !session.passPhoneState) {
+      return null;
     }
-  }, [isCompleted]);
+    return aggregatePassPhoneResult(session);
+  }, [isCompleted, sessionType, session]);
 
-  // Validation based on interaction type
-  const interactionType = resolveInteractionType(currentQuestion);
+  const resetLocalSelections = () => {
+    setSelectedOption(undefined);
+    setSelectedPlayerId(undefined);
+    setSelectedStance(undefined);
+    setSpotlightPlayerId(undefined);
+  };
+
+  // Redirect if no session exists
+  useEffect(() => {
+    if (!selectedVibeId || players.length < 2) {
+      router.replace('/vibes');
+    }
+  }, [selectedVibeId, players, router]);
+
+  // Check if player can advance
   const canAdvance = useMemo(() => {
     if (!currentQuestion) return false;
     switch (interactionType) {
       case 'choice':
-        return selectedOption === 'A' || selectedOption === 'B';
+        return selectedOption !== undefined;
       case 'player-select':
-        return typeof selectedPlayerId === 'string' && selectedPlayerId.length > 0;
+        return selectedPlayerId !== undefined;
       case 'stance':
-        return selectedStance === 'agree' || selectedStance === 'disagree';
+        return selectedStance !== undefined;
       case 'spotlight-quiz':
+        return spotlightPlayerId !== undefined;
       case 'discussion':
-      default:
         return true;
+      default:
+        return false;
     }
-  }, [currentQuestion, interactionType, selectedOption, selectedPlayerId, selectedStance]);
+  }, [currentQuestion, interactionType, selectedOption, selectedPlayerId, selectedStance, spotlightPlayerId]);
 
-  // ─── Turn Submission Handler (Standard vs Group) ───────────────────────────
+  // Handle Advance for Standard & Group Modes
   const handleNext = async () => {
     if (!canAdvance || isAdvancing) return;
-
-    haptic.impactMedium().catch(() => {});
     setIsAdvancing(true);
 
-    if (sessionType === 'group') {
-      // 1. Group Session: Submit individual response
-      let responsePayload: Parameters<typeof submitPlayerResponse>[0];
+    try {
+      if (sessionType === 'group') {
+        // Group Session: submit response for the current player
+        let res: { isQuestionComplete: boolean } = { isQuestionComplete: false };
+        if (interactionType === 'choice' && selectedOption) {
+          res = await submitPlayerResponse({ responseType: 'choice', selectedOption });
+        } else if (interactionType === 'player-select' && selectedPlayerId) {
+          res = await submitPlayerResponse({ responseType: 'player-select', selectedPlayerId });
+        } else if (interactionType === 'stance' && selectedStance) {
+          res = await submitPlayerResponse({ responseType: 'stance', selectedStance });
+        } else if (interactionType === 'spotlight-quiz') {
+          res = await submitPlayerResponse({ responseType: 'spotlight-quiz', targetPlayerId: spotlightPlayerId });
+        } else {
+          res = await submitPlayerResponse({ responseType: 'discussion', confirmed: true });
+        }
 
-      if (interactionType === 'choice') {
-        responsePayload = { responseType: 'choice', selectedOption: selectedOption! };
-      } else if (interactionType === 'player-select') {
-        responsePayload = { responseType: 'player-select', selectedPlayerId: selectedPlayerId! };
-      } else if (interactionType === 'stance') {
-        responsePayload = { responseType: 'stance', selectedStance: selectedStance! };
-      } else if (interactionType === 'spotlight-quiz') {
-        responsePayload = { responseType: 'spotlight-quiz', targetPlayerId: spotlightPlayerId };
+        resetLocalSelections();
+
+        // If next player must answer this same question, show privacy pass overlay
+        if (!res.isQuestionComplete) {
+          const nextIndex = (currentPlayerIndex + 1) % players.length;
+          const nextPlayer = players[nextIndex];
+          if (nextPlayer) {
+            setNextPlayerForOverlay(nextPlayer);
+            setPassPhoneOverlayVisible(true);
+          }
+        }
       } else {
-        responsePayload = { responseType: 'discussion', confirmed: true };
+        // Standard Session: submit collective summary answer
+        await answerAndAdvance({
+          selectedOption,
+          selectedPlayerId,
+          selectedStance,
+          targetPlayerId: spotlightPlayerId,
+        });
+        resetLocalSelections();
       }
-
-      const totalP = players.length;
-      const nextIdx = (currentPlayerIndex + 1) % totalP;
-      const nextP = players[nextIdx];
-
-      // Immediately hide previous answer state to protect privacy
-      setSelectedOption(undefined);
-      setSelectedPlayerId(undefined);
-      setSelectedStance(undefined);
-      setSpotlightPlayerId(undefined);
-
-      const { isQuestionComplete } = await submitPlayerResponse(responsePayload);
-
-      if (!isQuestionComplete || currentRound < totalRounds) {
-        // Show privacy barrier before next player takes device
-        setNextPlayerForOverlay(nextP);
-        setPassPhoneOverlayVisible(true);
-      }
-
-      setIsAdvancing(false);
-    } else {
-      // 2. Standard Game: Submit group summary answer
-      await answerAndAdvance({
-        selectedOption,
-        selectedPlayerId,
-        selectedStance,
-        targetPlayerId: spotlightPlayerId,
-      });
-
-      setSelectedOption(undefined);
-      setSelectedPlayerId(undefined);
-      setSelectedStance(undefined);
-      setSpotlightPlayerId(undefined);
+    } catch {
+      // Fallback cleanly
+    } finally {
       setIsAdvancing(false);
     }
   };
 
   const handleReplay = async () => {
-    haptic.impactMedium().catch(() => {});
-    setSelectedOption(undefined);
-    setSelectedPlayerId(undefined);
-    setSelectedStance(undefined);
-    setSpotlightPlayerId(undefined);
-    setPassPhoneOverlayVisible(false);
+    resetLocalSelections();
     setIsAdvancing(false);
     await replayGame();
   };
 
   const handleExit = () => {
     Alert.alert(
-      'Exit Game?',
-      'Are you sure you want to end tonight’s session?',
+      t('common.exitGamePrompt', language),
+      t('common.exitGameMessage', language),
       [
-        { text: 'Keep Playing', style: 'cancel' },
+        { text: t('common.keepPlaying', language), style: 'cancel' },
         {
-          text: 'Exit',
+          text: t('common.exitConfirm', language),
           style: 'destructive',
           onPress: () => {
             resetSession();
@@ -217,10 +256,7 @@ export default function GameScreen() {
     return (
       <ScreenContainer contentStyle={styles.centerContainer}>
         <AppText variant="heading" style={styles.centerText}>
-          No Active Session
-        </AppText>
-        <AppText variant="body" color="secondary" style={styles.centerSubtext}>
-          Please select a vibe and add players to start playing.
+          {t('common.exit', language)}
         </AppText>
         <AppButton
           size="lg"
@@ -228,18 +264,22 @@ export default function GameScreen() {
           onPress={() => router.replace('/vibes')}
           style={styles.primaryCta}
         >
-          START NEW GAME
+          {t('common.home', language)}
         </AppButton>
       </ScreenContainer>
     );
   }
 
-  // ─── Group Session Completed Screen (Observable Facts & Group Perception) ─
-  if (isCompleted && sessionType === 'group' && groupResult) {
+  // ─── 1. Pass The Phone Completed Screen ───────────────────────────────────
+  if (isCompleted && sessionType === 'pass-the-phone' && passPhoneResult) {
     return (
       <ScreenContainer scrollable contentStyle={styles.container}>
-        <View style={styles.navBar}>
-          <Badge label="GROUP PERCEPTION" color={theme.colors.accentMuted} textColor={theme.colors.accent} />
+        <View style={[styles.navBar, rtl && styles.rowRTL]}>
+          <Badge
+            label={t('sessionType.passPhone.title', language).toUpperCase()}
+            color={theme.colors.accentMuted}
+            textColor={theme.colors.accent}
+          />
           {activeVibe && (
             <Badge
               label={`${activeVibe.emoji} ${activeVibe.label}`}
@@ -250,35 +290,219 @@ export default function GameScreen() {
         </View>
 
         <Animated.View entering={FadeIn.duration(400)} style={styles.completedHeader}>
-          <AppText variant="display" style={styles.completedTitle}>
-            Group Results.
+          <AppText variant="display" style={[styles.completedTitle, rtl && styles.textRTL]}>
+            {t('passPhone.resultsTitle', language)}
           </AppText>
-          <AppText variant="body" color="secondary" style={styles.subtitle}>
-            Collected {groupResult.totalCollectedResponses} private answers across {players.length} players.
+          <AppText variant="body" color="secondary" style={[styles.subtitle, rtl && styles.textRTL]}>
+            {t('passPhone.resultsSubtitle', language, { rounds: passPhoneResult.totalRounds })}
           </AppText>
         </Animated.View>
 
-        {/* 1. Most Selected Players Card */}
+        {/* Total Shots Taken Card */}
+        <Animated.View entering={FadeIn.duration(450)} style={styles.summaryBox}>
+          <AppCard variant="elevated" padding="lg" glow style={[styles.synergyCard, { borderColor: vibeColor }]}>
+            <AppText variant="overline" style={[styles.synergyTag, { color: vibeColor }]}>
+              {t('passPhone.partyToll', language)}
+            </AppText>
+            <AppText variant="display" style={styles.synergyTitle}>
+              {t('passPhone.shotsTaken', language, { count: passPhoneResult.totalShots })}
+            </AppText>
+            <AppText variant="body" color="secondary" style={[styles.synergySubtitle, rtl && styles.textRTL]}>
+              {passPhoneResult.totalShots > 0
+                ? t('passPhone.shotsSubtitle', language, { count: passPhoneResult.totalShots })
+                : t('passPhone.noShotsSubtitle', language)}
+            </AppText>
+          </AppCard>
+        </Animated.View>
+
+        {/* Most Targeted Player & Most Frequent Selector */}
+        <Animated.View entering={FadeIn.duration(500)} style={styles.summaryBox}>
+          <View style={[styles.statsGrid, rtl && styles.rowRTL]}>
+            {passPhoneResult.mostTargetedPlayer && (
+              <AppCard variant="default" padding="md" style={styles.statCard}>
+                <AppText variant="overline" color="secondary">
+                  {t('passPhone.mostTargeted', language)}
+                </AppText>
+                <AppText variant="heading" style={styles.statHighlightName}>
+                  🎯 {passPhoneResult.mostTargetedPlayer.name}
+                </AppText>
+                <AppText variant="caption" color="secondary">
+                  {t('passPhone.targetedTimes', language, { count: passPhoneResult.mostTargetedPlayer.count })}
+                </AppText>
+              </AppCard>
+            )}
+
+            {passPhoneResult.mostFrequentSelector && (
+              <AppCard variant="default" padding="md" style={styles.statCard}>
+                <AppText variant="overline" color="secondary">
+                  {t('passPhone.topSelector', language)}
+                </AppText>
+                <AppText variant="heading" style={styles.statHighlightName}>
+                  🕵️ {passPhoneResult.mostFrequentSelector.name}
+                </AppText>
+                <AppText variant="caption" color="secondary">
+                  {t('passPhone.passedTimes', language, { count: passPhoneResult.mostFrequentSelector.count })}
+                </AppText>
+              </AppCard>
+            )}
+          </View>
+        </Animated.View>
+
+        {/* Relationship Matrix Breakdown */}
+        <Animated.View entering={FadeIn.duration(550)} style={styles.summaryBox}>
+          <AppText
+            variant="overline"
+            color="secondary"
+            style={[styles.sectionHeader, rtl && styles.textRTL]}
+          >
+            {t('group.whoSelectedWhom', language)}
+          </AppText>
+          <View style={styles.insightsList}>
+            {players.map((p) => {
+              const targetsMap = passPhoneResult.relationshipMatrix[p.id] || {};
+              const targets = Object.entries(targetsMap).filter(([, count]) => count > 0);
+
+              return (
+                <AppCard
+                  key={p.id}
+                  variant="default"
+                  padding="md"
+                  style={[styles.playerInsightCard, { borderColor: `${p.color || theme.colors.accent}44` }]}
+                >
+                  <View style={[styles.insightHeaderRow, rtl && styles.rowRTL]}>
+                    <View style={[styles.insightAvatar, { backgroundColor: p.color || theme.colors.accent }]}>
+                      <AppText style={styles.avatarInitial}>{p.name.charAt(0).toUpperCase()}</AppText>
+                    </View>
+                    <View style={styles.insightNameBox}>
+                      <AppText variant="label" style={[styles.playerName, rtl && styles.textRTL]}>
+                        {p.name}
+                      </AppText>
+                    </View>
+                  </View>
+
+                  <View style={styles.patternBox}>
+                    <AppText
+                      variant="caption"
+                      color="secondary"
+                      style={[styles.patternLabel, rtl && styles.textRTL]}
+                    >
+                      {t('passPhone.passedPhoneTo', language)}
+                    </AppText>
+                    {targets.length > 0 ? (
+                      targets.map(([targetId, count]) => {
+                        const targetPlayer = players.find((pl) => pl.id === targetId);
+                        return (
+                          <AppText
+                            key={targetId}
+                            variant="bodySmall"
+                            style={[styles.patternRow, rtl && styles.textRTL]}
+                          >
+                            👉 <AppText style={{ fontWeight: '700' }}>{targetPlayer?.name || 'Unknown'}</AppText> ({count}x)
+                          </AppText>
+                        );
+                      })
+                    ) : (
+                      <AppText
+                        variant="caption"
+                        color="secondary"
+                        style={rtl && styles.textRTL}
+                      >
+                        {t('passPhone.didNotTarget', language)}
+                      </AppText>
+                    )}
+                  </View>
+                </AppCard>
+              );
+            })}
+          </View>
+        </Animated.View>
+
+        {/* Bottom Actions */}
+        <Animated.View entering={FadeIn.duration(600)} style={styles.bottomArea}>
+          <AppButton size="lg" fullWidth onPress={handleReplay} style={styles.primaryCta}>
+            {t('common.playAgain', language)}
+          </AppButton>
+          <AppButton
+            variant="secondary"
+            size="md"
+            fullWidth
+            onPress={() => router.push('/game-mode')}
+            style={styles.secondaryCta}
+          >
+            {t('common.changeMode', language)}
+          </AppButton>
+          <AppButton
+            variant="ghost"
+            size="md"
+            fullWidth
+            onPress={() => {
+              resetSession();
+              router.replace('/');
+            }}
+          >
+            {t('common.home', language)}
+          </AppButton>
+        </Animated.View>
+      </ScreenContainer>
+    );
+  }
+
+  // ─── 2. Group Session Completed Screen ────────────────────────────────────
+  if (isCompleted && sessionType === 'group' && groupResult) {
+    return (
+      <ScreenContainer scrollable contentStyle={styles.container}>
+        <View style={[styles.navBar, rtl && styles.rowRTL]}>
+          <Badge
+            label={t('sessionType.group.title', language).toUpperCase()}
+            color={theme.colors.accentMuted}
+            textColor={theme.colors.accent}
+          />
+          {activeVibe && (
+            <Badge
+              label={`${activeVibe.emoji} ${activeVibe.label}`}
+              color={theme.colors.surfaceElevated}
+              textColor={vibeColor}
+            />
+          )}
+        </View>
+
+        <Animated.View entering={FadeIn.duration(400)} style={styles.completedHeader}>
+          <AppText variant="display" style={[styles.completedTitle, rtl && styles.textRTL]}>
+            {t('group.resultsTitle', language)}
+          </AppText>
+          <AppText variant="body" color="secondary" style={[styles.subtitle, rtl && styles.textRTL]}>
+            {t('group.resultsSubtitle', language, {
+              count: groupResult.totalCollectedResponses,
+              players: players.length,
+            })}
+          </AppText>
+        </Animated.View>
+
+        {/* Most Selected Players Card */}
         {groupResult.topSelectedPlayers.length > 0 && (
           <Animated.View entering={FadeIn.duration(500)} style={styles.summaryBox}>
             <AppCard variant="elevated" padding="lg" glow style={[styles.synergyCard, { borderColor: vibeColor }]}>
               <AppText variant="overline" style={[styles.synergyTag, { color: vibeColor }]}>
-                MOST SELECTED BY GROUP
+                {t('group.mostSelectedTag', language)}
               </AppText>
               <AppText variant="heading" style={styles.synergyTitle}>
                 👑 {groupResult.topSelectedPlayers[0].name}
               </AppText>
-              <AppText variant="body" color="secondary" style={styles.synergySubtitle}>
-                Received {groupResult.topSelectedPlayers[0].count} votes from the group.
+              <AppText variant="body" color="secondary" style={[styles.synergySubtitle, rtl && styles.textRTL]}>
+                {t('group.votesCount', language, { count: groupResult.topSelectedPlayers[0].count })}
               </AppText>
             </AppCard>
           </Animated.View>
         )}
 
-        {/* 2. Individual Selection Patterns & Matrix */}
+        {/* Individual Selection Patterns & Matrix */}
         <Animated.View entering={FadeIn.duration(550)} style={styles.summaryBox}>
-          <AppText variant="overline" color="secondary" style={styles.sectionHeader}>
-            WHO SELECTED WHOM
+          <AppText
+            variant="overline"
+            color="secondary"
+            style={[styles.sectionHeader, rtl && styles.textRTL]}
+          >
+            {t('group.whoSelectedWhom', language)}
           </AppText>
 
           <View style={styles.insightsList}>
@@ -294,38 +518,48 @@ export default function GameScreen() {
                   padding="md"
                   style={[styles.playerInsightCard, { borderColor: `${p.color || theme.colors.accent}44` }]}
                 >
-                  <View style={styles.insightHeaderRow}>
+                  <View style={[styles.insightHeaderRow, rtl && styles.rowRTL]}>
                     <View style={[styles.insightAvatar, { backgroundColor: p.color || theme.colors.accent }]}>
-                      <AppText style={styles.avatarInitial}>
-                        {p.name.charAt(0).toUpperCase()}
-                      </AppText>
+                      <AppText style={styles.avatarInitial}>{p.name.charAt(0).toUpperCase()}</AppText>
                     </View>
                     <View style={styles.insightNameBox}>
-                      <AppText variant="label" style={styles.playerName}>
+                      <AppText variant="label" style={[styles.playerName, rtl && styles.textRTL]}>
                         {p.name}
                       </AppText>
-                      <AppText variant="caption" color="secondary">
-                        Received {stats?.timesSelected || 0} votes ({stats?.selectionPercentage || 0}%)
+                      <AppText variant="caption" color="secondary" style={rtl && styles.textRTL}>
+                        {stats?.timesSelected || 0} votes ({stats?.selectionPercentage || 0}%)
                       </AppText>
                     </View>
                   </View>
 
                   <View style={styles.patternBox}>
-                    <AppText variant="caption" color="secondary" style={styles.patternLabel}>
-                      Voted for:
+                    <AppText
+                      variant="caption"
+                      color="secondary"
+                      style={[styles.patternLabel, rtl && styles.textRTL]}
+                    >
+                      {t('group.votedFor', language)}
                     </AppText>
                     {targets.length > 0 ? (
                       targets.map(([targetId, count]) => {
                         const targetPlayer = players.find((pl) => pl.id === targetId);
                         return (
-                          <AppText key={targetId} variant="bodySmall" style={styles.patternRow}>
+                          <AppText
+                            key={targetId}
+                            variant="bodySmall"
+                            style={[styles.patternRow, rtl && styles.textRTL]}
+                          >
                             👉 <AppText style={{ fontWeight: '700' }}>{targetPlayer?.name || 'Unknown'}</AppText> ({count}x)
                           </AppText>
                         );
                       })
                     ) : (
-                      <AppText variant="caption" color="secondary">
-                        No direct player selections recorded.
+                      <AppText
+                        variant="caption"
+                        color="secondary"
+                        style={rtl && styles.textRTL}
+                      >
+                        {t('group.noSelections', language)}
                       </AppText>
                     )}
                   </View>
@@ -335,18 +569,22 @@ export default function GameScreen() {
           </View>
         </Animated.View>
 
-        {/* 3. Choice & Stance Distributions */}
+        {/* Choice & Stance Distributions */}
         {groupResult.choiceBreakdowns.length > 0 && (
           <Animated.View entering={FadeIn.duration(600)} style={styles.summaryBox}>
-            <AppText variant="overline" color="secondary" style={styles.sectionHeader}>
-              WOULD YOU RATHER SPLITS
+            <AppText
+              variant="overline"
+              color="secondary"
+              style={[styles.sectionHeader, rtl && styles.textRTL]}
+            >
+              {t('group.wyrSplits', language)}
             </AppText>
             {groupResult.choiceBreakdowns.map((cb, idx) => (
               <AppCard key={idx} variant="default" padding="sm" style={styles.distributionCard}>
-                <AppText variant="label" style={styles.distQuestionText}>
+                <AppText variant="label" style={[styles.distQuestionText, rtl && styles.textRTL]}>
                   {cb.questionText || `Question ${idx + 1}`}
                 </AppText>
-                <View style={styles.distStatsRow}>
+                <View style={[styles.distStatsRow, rtl && styles.rowRTL]}>
                   <Badge label={`Option A: ${cb.optionACount}`} color={theme.colors.surfaceElevated} />
                   <Badge label={`Option B: ${cb.optionBCount}`} color={theme.colors.surfaceElevated} />
                 </View>
@@ -358,7 +596,7 @@ export default function GameScreen() {
         {/* Bottom Actions */}
         <Animated.View entering={FadeIn.duration(650)} style={styles.bottomArea}>
           <AppButton size="lg" fullWidth onPress={handleReplay} style={styles.primaryCta}>
-            PLAY AGAIN (NEW QUESTIONS)
+            {t('common.playAgain', language)}
           </AppButton>
           <AppButton
             variant="secondary"
@@ -367,7 +605,7 @@ export default function GameScreen() {
             onPress={() => router.push('/game-mode')}
             style={styles.secondaryCta}
           >
-            CHANGE MODE
+            {t('common.changeMode', language)}
           </AppButton>
           <AppButton
             variant="ghost"
@@ -378,19 +616,23 @@ export default function GameScreen() {
               router.replace('/');
             }}
           >
-            HOME
+            {t('common.home', language)}
           </AppButton>
         </Animated.View>
       </ScreenContainer>
     );
   }
 
-  // ─── Standard Game Completed Screen State (Persona Insights) ─────────────
+  // ─── 3. Standard Game Completed Screen ────────────────────────────────────
   if (isCompleted && recap) {
     return (
       <ScreenContainer scrollable contentStyle={styles.container}>
-        <View style={styles.navBar}>
-          <Badge label="NIGHT RECAP" color={theme.colors.accentMuted} textColor={theme.colors.accent} />
+        <View style={[styles.navBar, rtl && styles.rowRTL]}>
+          <Badge
+            label={t('recap.badge', language)}
+            color={theme.colors.accentMuted}
+            textColor={theme.colors.accent}
+          />
           {activeVibe && (
             <Badge
               label={`${activeVibe.emoji} ${activeVibe.label}`}
@@ -401,24 +643,24 @@ export default function GameScreen() {
         </View>
 
         <Animated.View entering={FadeIn.duration(400)} style={styles.completedHeader}>
-          <AppText variant="display" style={styles.completedTitle}>
-            Tonight&apos;s Verdict.
+          <AppText variant="display" style={[styles.completedTitle, rtl && styles.textRTL]}>
+            {t('recap.title', language)}
           </AppText>
-          <AppText variant="body" color="secondary" style={styles.subtitle}>
-            Based on all {totalRounds} rounds of unfiltered answers.
+          <AppText variant="body" color="secondary" style={[styles.subtitle, rtl && styles.textRTL]}>
+            {t('recap.subtitle', language, { rounds: totalRounds })}
           </AppText>
         </Animated.View>
 
-        {/* 1. Group / Duo Synergy Card */}
+        {/* Group / Duo Synergy Card */}
         <Animated.View entering={FadeIn.duration(500)} style={styles.summaryBox}>
           <AppCard variant="elevated" padding="lg" glow style={[styles.synergyCard, { borderColor: vibeColor }]}>
             <AppText variant="overline" style={[styles.synergyTag, { color: vibeColor }]}>
-              CHEMISTRY & SYNERGY
+              {t('recap.chemistryTag', language)}
             </AppText>
             <AppText variant="heading" style={styles.synergyTitle}>
               {recap.synergyTitle}
             </AppText>
-            <AppText variant="body" color="secondary" style={styles.synergySubtitle}>
+            <AppText variant="body" color="secondary" style={[styles.synergySubtitle, rtl && styles.textRTL]}>
               {recap.synergySubtitle}
             </AppText>
             <View style={styles.vibeSummaryPill}>
@@ -428,9 +670,12 @@ export default function GameScreen() {
             </View>
           </AppCard>
 
-          {/* 2. Player Persona Insights */}
-          <AppText variant="overline" color="secondary" style={styles.sectionHeader}>
-            PLAYER ARCHETYPES & ROASTS
+          <AppText
+            variant="overline"
+            color="secondary"
+            style={[styles.sectionHeader, rtl && styles.textRTL]}
+          >
+            {t('recap.archetypesHeader', language)}
           </AppText>
 
           <View style={styles.insightsList}>
@@ -443,24 +688,24 @@ export default function GameScreen() {
                   padding="md"
                   style={[styles.playerInsightCard, { borderColor: `${pColor}44` }]}
                 >
-                  <View style={styles.insightHeaderRow}>
+                  <View style={[styles.insightHeaderRow, rtl && styles.rowRTL]}>
                     <View style={[styles.insightAvatar, { backgroundColor: pColor }]}>
                       <AppText style={styles.avatarInitial}>
                         {insight.playerName.charAt(0).toUpperCase()}
                       </AppText>
                     </View>
                     <View style={styles.insightNameBox}>
-                      <AppText variant="label" style={styles.playerName}>
+                      <AppText variant="label" style={[styles.playerName, rtl && styles.textRTL]}>
                         {insight.playerName}
                       </AppText>
-                      <AppText variant="caption" style={{ color: pColor, fontWeight: '700' }}>
-                        {insight.badge}
+                      <AppText variant="caption" color="secondary" style={rtl && styles.textRTL}>
+                        {insight.title}
                       </AppText>
                     </View>
+                    <Badge label={insight.badge} color={theme.colors.surfaceElevated} textColor={pColor} />
                   </View>
-
-                  <AppText variant="bodySmall" color="secondary" style={styles.roastText}>
-                    &quot;{insight.roastOrCompliment}&quot;
+                  <AppText variant="bodySmall" style={[styles.roastText, rtl && styles.textRTL]}>
+                    &ldquo;{insight.roastOrCompliment}&rdquo;
                   </AppText>
                 </AppCard>
               );
@@ -471,7 +716,7 @@ export default function GameScreen() {
         {/* Bottom Actions */}
         <Animated.View entering={FadeIn.duration(600)} style={styles.bottomArea}>
           <AppButton size="lg" fullWidth onPress={handleReplay} style={styles.primaryCta}>
-            PLAY AGAIN (NEW QUESTIONS)
+            {t('common.playAgain', language)}
           </AppButton>
           <AppButton
             variant="secondary"
@@ -480,7 +725,7 @@ export default function GameScreen() {
             onPress={() => router.push('/game-mode')}
             style={styles.secondaryCta}
           >
-            CHANGE MODE
+            {t('common.changeMode', language)}
           </AppButton>
           <AppButton
             variant="ghost"
@@ -491,18 +736,208 @@ export default function GameScreen() {
               router.replace('/');
             }}
           >
-            HOME
+            {t('common.home', language)}
           </AppButton>
         </Animated.View>
       </ScreenContainer>
     );
   }
 
-  // ─── Active Playing State ─────────────────────────────────────────────────
+  // ─── 4. Pass The Phone Active Playing Loop ────────────────────────────────
+  if (sessionType === 'pass-the-phone') {
+    const validTargets = getValidTargetsForSelector(players, passPhoneSelector.id);
+    const progressPercent = Math.min(100, Math.max(10, (currentRound / totalRounds) * 100));
+
+    return (
+      <ScreenContainer scrollable contentStyle={styles.container}>
+        {/* Top Bar */}
+        <View style={[styles.navBar, rtl && styles.rowRTL]}>
+          <IconButton variant="surface" size="sm" onPress={handleExit} accessibilityLabel="Exit session">
+            <AppText style={styles.exitIcon}>✕</AppText>
+          </IconButton>
+          {activeVibe && (
+            <Badge label={`${activeVibe.emoji} ${activeVibe.label}`} color={theme.colors.surfaceElevated} textColor={vibeColor} />
+          )}
+          <Badge label={`${currentRound}/${totalRounds}`} color={theme.colors.accentMuted} textColor={theme.colors.accent} />
+        </View>
+
+        {/* Progress Track */}
+        <View style={styles.progressTrack}>
+          <View style={[styles.progressFill, { width: `${progressPercent}%`, backgroundColor: vibeColor }]} />
+        </View>
+
+        {/* Phase 1: SELECTING_TARGET */}
+        {passPhonePhase === 'SELECTING_TARGET' && (
+          <Animated.View entering={FadeIn.duration(300)} style={styles.passPhoneContainer}>
+            <View style={[styles.playerTurnBanner, rtl && styles.rowRTL]}>
+              <View style={[styles.playerTurnDot, { backgroundColor: passPhoneSelector.color || vibeColor }]} />
+              <AppText variant="label" style={styles.playerTurnText}>
+                {t('passPhone.secretTurnBanner', language, { name: passPhoneSelector.name.toUpperCase() })}
+              </AppText>
+            </View>
+
+            <AppCard variant="elevated" padding="xl" glow style={styles.questionCard}>
+              <AppText variant="heading" style={[styles.questionText, rtl && styles.textRTL]}>
+                {currentQuestion?.text}
+              </AppText>
+            </AppCard>
+
+            <AppText
+              variant="overline"
+              color="secondary"
+              style={[styles.targetSectionLabel, rtl && styles.textRTL]}
+            >
+              {t('passPhone.chooseTargetPrompt', language)}
+            </AppText>
+
+            <View style={styles.targetList}>
+              {validTargets.map((target) => (
+                <Pressable
+                  key={target.id}
+                  onPress={() => {
+                    haptic.selection().catch(() => {});
+                    selectPassPhoneTarget(target.id);
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Target ${target.name}`}
+                  style={({ pressed }) => [
+                    styles.targetButton,
+                    { borderColor: target.color || theme.colors.border },
+                    rtl && styles.rowRTL,
+                    pressed && styles.cardPressed,
+                  ]}
+                >
+                  <View style={[styles.targetAvatar, { backgroundColor: target.color || theme.colors.accent }]}>
+                    <AppText style={styles.avatarInitial}>{target.name.charAt(0).toUpperCase()}</AppText>
+                  </View>
+                  <AppText variant="label" style={[styles.targetName, rtl && styles.textRTL]}>
+                    {target.name}
+                  </AppText>
+                  <AppText style={styles.targetArrow}>{rtl ? '←' : '→'}</AppText>
+                </Pressable>
+              ))}
+            </View>
+          </Animated.View>
+        )}
+
+        {/* Phase 2: PASSING_PHONE */}
+        {passPhonePhase === 'PASSING_PHONE' && passPhoneTarget && (
+          <Animated.View entering={FadeIn.duration(300)} style={styles.passPhoneMiddlePhase}>
+            <View style={styles.passPhoneCard}>
+              <AppText style={styles.hugeEmoji}>📱</AppText>
+              <AppText variant="display" style={[styles.passPhoneTitle, rtl && styles.textRTL]}>
+                {t('passPhone.handoverTitle', language, { target: passPhoneTarget.name })}
+              </AppText>
+              <AppText variant="body" color="secondary" style={[styles.passPhoneSubtext, rtl && styles.textRTL]}>
+                {t('passPhone.handoverSubtitle', language)}
+              </AppText>
+
+              <AppButton
+                size="lg"
+                fullWidth
+                onPress={() => {
+                  haptic.impactMedium().catch(() => {});
+                  confirmPassPhoneHandover();
+                }}
+                style={styles.primaryCta}
+              >
+                {t('passPhone.readyButton', language, { target: passPhoneTarget.name.toUpperCase() })}
+              </AppButton>
+            </View>
+          </Animated.View>
+        )}
+
+        {/* Phase 3: TARGET_ACTION */}
+        {passPhonePhase === 'TARGET_ACTION' && passPhoneTarget && (
+          <Animated.View entering={FadeIn.duration(300)} style={styles.passPhoneMiddlePhase}>
+            <View style={styles.passPhoneCard}>
+              <AppText style={styles.hugeEmoji}>👀</AppText>
+              <AppText variant="display" style={[styles.passPhoneTitle, rtl && styles.textRTL]}>
+                {t('passPhone.actionTitle', language)}
+              </AppText>
+              <AppText variant="body" color="secondary" style={[styles.passPhoneSubtext, rtl && styles.textRTL]}>
+                {t('passPhone.actionSubtitle', language)}
+              </AppText>
+
+              <View style={styles.actionButtons}>
+                <AppButton
+                  size="lg"
+                  fullWidth
+                  onPress={() => {
+                    haptic.impactHeavy().catch(() => {});
+                    commitPassPhoneAction('take-shot');
+                  }}
+                  style={styles.shotButton}
+                >
+                  {t('passPhone.takeShotButton', language)}
+                </AppButton>
+
+                <AppButton
+                  variant="secondary"
+                  size="lg"
+                  fullWidth
+                  onPress={() => {
+                    haptic.impactMedium().catch(() => {});
+                    commitPassPhoneAction('show-question');
+                  }}
+                  style={styles.revealButton}
+                >
+                  {t('passPhone.showQuestionButton', language)}
+                </AppButton>
+              </View>
+            </View>
+          </Animated.View>
+        )}
+
+        {/* Phase 4: REVEALING_QUESTION */}
+        {passPhonePhase === 'REVEALING_QUESTION' && (
+          <Animated.View entering={FadeIn.duration(300)} style={styles.passPhoneContainer}>
+            <Badge
+              label={t('passPhone.questionWasBadge', language)}
+              color={theme.colors.accentMuted}
+              textColor={theme.colors.accent}
+            />
+
+            <AppCard variant="elevated" padding="xl" glow style={[styles.questionCard, { marginTop: theme.spacing.md }]}>
+              <AppText variant="heading" style={[styles.questionText, rtl && styles.textRTL]}>
+                &ldquo;{currentQuestion?.text}&rdquo;
+              </AppText>
+            </AppCard>
+
+            <AppCard variant="default" padding="lg" style={styles.selectorRevealCard}>
+              <AppText variant="body" style={[styles.selectorRevealText, rtl && styles.textRTL]}>
+                {t('passPhone.selectorRevealed', language, {
+                  selector: passPhoneSelector.name,
+                  target: passPhoneTarget?.name || '',
+                })}
+              </AppText>
+            </AppCard>
+
+            <View style={styles.bottomArea}>
+              <AppButton
+                size="lg"
+                fullWidth
+                onPress={() => {
+                  haptic.impactMedium().catch(() => {});
+                  acknowledgePassPhoneReveal();
+                }}
+                style={styles.primaryCta}
+              >
+                {currentRound >= totalRounds
+                  ? t('passPhone.viewResults', language)
+                  : t('passPhone.nextRound', language)}
+              </AppButton>
+            </View>
+          </Animated.View>
+        )}
+      </ScreenContainer>
+    );
+  }
+
+  // ─── 5. Standard & Group Active Playing Loop ──────────────────────────────
   const isLastRound = currentRound >= totalRounds;
   const isLastPlayer = sessionType === 'group' && currentPlayerIndex >= players.length - 1;
   const progressPercent = Math.min(100, Math.max(10, (currentRound / totalRounds) * 100));
-
   const activePlayerColor = currentAnsweringPlayer?.color || vibeColor;
 
   return (
@@ -519,7 +954,7 @@ export default function GameScreen() {
       />
 
       {/* Top Navigation Bar */}
-      <View style={styles.navBar}>
+      <View style={[styles.navBar, rtl && styles.rowRTL]}>
         <IconButton
           variant="surface"
           size="sm"
@@ -556,13 +991,10 @@ export default function GameScreen() {
 
       {/* Active Answering Player Banner (Group Session) */}
       {sessionType === 'group' && currentAnsweringPlayer && (
-        <Animated.View entering={FadeIn.duration(250)} style={styles.playerTurnBanner}>
+        <Animated.View entering={FadeIn.duration(250)} style={[styles.playerTurnBanner, rtl && styles.rowRTL]}>
           <View style={[styles.playerTurnDot, { backgroundColor: activePlayerColor }]} />
           <AppText variant="label" style={styles.playerTurnText}>
-            <AppText style={{ color: activePlayerColor, fontWeight: '800' }}>
-              {currentAnsweringPlayer.name.toUpperCase()}
-            </AppText>
-            &apos;S TURN
+            {t('group.turnBanner', language, { name: currentAnsweringPlayer.name.toUpperCase() })}
           </AppText>
           <Badge
             label={`${currentPlayerIndex + 1}/${players.length}`}
@@ -587,7 +1019,7 @@ export default function GameScreen() {
           style={styles.questionSection}
         >
           <AppCard variant="elevated" padding="xl" glow style={styles.questionCard}>
-            <AppText variant="heading" style={styles.questionText}>
+            <AppText variant="heading" style={[styles.questionText, rtl && styles.textRTL]}>
               {currentQuestion.text}
             </AppText>
           </AppCard>
@@ -645,13 +1077,13 @@ export default function GameScreen() {
         >
           {sessionType === 'group'
             ? isLastRound && isLastPlayer
-              ? 'FINISH GROUP SESSION'
+              ? t('group.finishSession', language)
               : isLastPlayer
-              ? 'NEXT QUESTION'
-              : 'SUBMIT & PASS PHONE'
+              ? t('common.nextQuestion', language)
+              : t('group.submitAndPass', language)
             : isLastRound
-            ? 'FINISH GAME'
-            : 'NEXT QUESTION'}
+            ? t('common.finishGame', language)
+            : t('common.nextQuestion', language)}
         </AppButton>
       </Animated.View>
     </ScreenContainer>
@@ -670,10 +1102,6 @@ const styles = StyleSheet.create({
   },
   centerText: {
     textAlign: 'center',
-  },
-  centerSubtext: {
-    textAlign: 'center',
-    marginBottom: theme.spacing.lg,
   },
   navBar: {
     flexDirection: 'row',
@@ -744,13 +1172,20 @@ const styles = StyleSheet.create({
     lineHeight: 32,
     color: theme.colors.text.primary,
   },
+  textRTL: {
+    writingDirection: 'rtl',
+    textAlign: 'right',
+  },
+  rowRTL: {
+    flexDirection: 'row-reverse',
+  },
   interactionArea: {
     width: '100%',
   },
   bottomArea: {
     marginTop: 'auto',
-    paddingTop: theme.spacing.sm,
-    gap: theme.spacing.xs,
+    gap: theme.spacing.sm,
+    paddingTop: theme.spacing.md,
   },
   primaryCta: {
     ...theme.shadow.glow,
@@ -759,113 +1194,225 @@ const styles = StyleSheet.create({
     marginTop: theme.spacing.xs,
   },
   completedHeader: {
+    marginTop: theme.spacing.md,
     marginBottom: theme.spacing.lg,
   },
   completedTitle: {
     color: theme.colors.text.primary,
-    fontSize: 38,
-    lineHeight: 44,
+    fontSize: theme.typography.size['4xl'],
   },
   subtitle: {
     marginTop: theme.spacing.xs,
   },
   summaryBox: {
-    gap: theme.spacing.md,
     marginBottom: theme.spacing.xl,
   },
   synergyCard: {
-    borderRadius: theme.radius.xl,
     borderWidth: 1.5,
-    gap: theme.spacing.xs,
+    borderRadius: theme.radius.xl,
+    backgroundColor: theme.colors.surfaceElevated,
+    alignItems: 'center',
+    textAlign: 'center',
   },
   synergyTag: {
-    letterSpacing: 1.2,
+    letterSpacing: 2,
+    marginBottom: theme.spacing.xs,
   },
   synergyTitle: {
-    fontSize: theme.typography.size.xl,
+    fontSize: theme.typography.size['2xl'],
     color: theme.colors.text.primary,
+    textAlign: 'center',
+    marginBottom: theme.spacing.xs,
   },
   synergySubtitle: {
+    textAlign: 'center',
     fontSize: theme.typography.size.sm,
-    lineHeight: 20,
   },
   vibeSummaryPill: {
-    backgroundColor: theme.colors.surfaceHighlight,
+    marginTop: theme.spacing.md,
     paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.sm,
-    borderRadius: theme.radius.md,
-    marginTop: theme.spacing.xs,
+    paddingVertical: theme.spacing.xs,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: theme.radius.full,
   },
   vibeSummaryText: {
-    color: theme.colors.text.primary,
-    fontSize: theme.typography.size.xs,
+    color: theme.colors.text.secondary,
+    textAlign: 'center',
   },
   sectionHeader: {
-    marginTop: theme.spacing.xs,
+    marginTop: theme.spacing.lg,
+    marginBottom: theme.spacing.md,
     letterSpacing: 1.5,
   },
   insightsList: {
-    gap: theme.spacing.sm,
+    gap: theme.spacing.md,
   },
   playerInsightCard: {
     borderRadius: theme.radius.lg,
     borderWidth: 1,
-    gap: theme.spacing.xs,
+    backgroundColor: theme.colors.surface,
   },
   insightHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: theme.spacing.sm,
+    gap: theme.spacing.md,
   },
   insightAvatar: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    alignItems: 'center',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: 'center',
+    alignItems: 'center',
   },
   avatarInitial: {
     color: '#FFFFFF',
-    fontSize: 14,
     fontWeight: theme.typography.weight.bold,
+    fontSize: 18,
   },
   insightNameBox: {
     flex: 1,
   },
   playerName: {
+    fontSize: theme.typography.size.md,
     color: theme.colors.text.primary,
   },
   roastText: {
+    marginTop: theme.spacing.sm,
     fontStyle: 'italic',
     color: theme.colors.text.secondary,
-    lineHeight: 18,
+    lineHeight: 20,
   },
   patternBox: {
-    marginTop: theme.spacing.xs,
-    backgroundColor: theme.colors.surfaceElevated,
-    padding: theme.spacing.sm,
-    borderRadius: theme.radius.md,
+    marginTop: theme.spacing.sm,
+    paddingTop: theme.spacing.xs,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border,
     gap: 4,
   },
   patternLabel: {
-    fontSize: 11,
-    textTransform: 'uppercase',
-    fontWeight: '700',
+    marginBottom: 2,
   },
   patternRow: {
-    fontSize: 13,
     color: theme.colors.text.primary,
   },
   distributionCard: {
     borderRadius: theme.radius.md,
+    marginBottom: theme.spacing.sm,
     gap: theme.spacing.xs,
-    marginBottom: theme.spacing.xs,
   },
   distQuestionText: {
-    fontSize: 13,
+    fontSize: theme.typography.size.sm,
+    color: theme.colors.text.primary,
   },
   distStatsRow: {
     flexDirection: 'row',
     gap: theme.spacing.sm,
+  },
+  // Pass The Phone styles
+  passPhoneContainer: {
+    gap: theme.spacing.md,
+    marginBottom: theme.spacing.xl,
+  },
+  targetSectionLabel: {
+    marginTop: theme.spacing.sm,
+    letterSpacing: 1.5,
+  },
+  targetList: {
+    gap: theme.spacing.sm,
+  },
+  targetButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: theme.spacing.md,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.radius.lg,
+    borderWidth: 1.5,
+  },
+  targetAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: theme.spacing.md,
+  },
+  targetName: {
+    flex: 1,
+    fontSize: theme.typography.size.md,
+    color: theme.colors.text.primary,
+  },
+  targetArrow: {
+    fontSize: 18,
+    color: theme.colors.text.secondary,
+  },
+  passPhoneMiddlePhase: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    minHeight: 420,
+  },
+  passPhoneCard: {
+    width: '100%',
+    alignItems: 'center',
+    padding: theme.spacing.xl,
+    backgroundColor: theme.colors.surfaceElevated,
+    borderRadius: theme.radius.xl,
+    borderWidth: 1.5,
+    borderColor: theme.colors.border,
+    ...theme.shadow.glow,
+  },
+  hugeEmoji: {
+    fontSize: 56,
+    marginBottom: theme.spacing.md,
+  },
+  passPhoneTitle: {
+    textAlign: 'center',
+    color: theme.colors.text.primary,
+    fontSize: theme.typography.size['3xl'],
+    marginBottom: theme.spacing.sm,
+  },
+  passPhoneSubtext: {
+    textAlign: 'center',
+    marginBottom: theme.spacing.xl,
+    lineHeight: 22,
+  },
+  actionButtons: {
+    width: '100%',
+    gap: theme.spacing.md,
+  },
+  shotButton: {
+    backgroundColor: '#EF4444',
+  },
+  revealButton: {
+    borderColor: theme.colors.accent,
+  },
+  selectorRevealCard: {
+    borderRadius: theme.radius.lg,
+    backgroundColor: theme.colors.surfaceElevated,
+    marginTop: theme.spacing.sm,
+  },
+  selectorRevealText: {
+    fontSize: theme.typography.size.md,
+    textAlign: 'center',
+    color: theme.colors.text.primary,
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    gap: theme.spacing.sm,
+  },
+  statCard: {
+    flex: 1,
+    alignItems: 'center',
+    borderRadius: theme.radius.lg,
+  },
+  statHighlightName: {
+    fontSize: theme.typography.size.lg,
+    marginTop: 4,
+    marginBottom: 2,
+    color: theme.colors.text.primary,
+  },
+  cardPressed: {
+    transform: [{ scale: 0.98 }],
+    opacity: 0.9,
   },
 });

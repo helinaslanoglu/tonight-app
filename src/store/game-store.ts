@@ -2,18 +2,30 @@ import { create } from 'zustand';
 
 import { defaultContentProvider } from '@/data';
 import {
+  acknowledgePassPhoneReveal,
+  advancePassPhoneRound,
   advanceSessionRound,
+  commitPassPhoneAction,
+  confirmPassPhoneHandover,
   DEFAULT_TOTAL_ROUNDS,
+  initPassPhoneState,
   recordPlayerResponse,
   replaySession,
+  selectNextQuestion,
+  selectPassPhoneTarget,
   startNewSession,
 } from '@/engine';
 import type {
   GameModeId,
   GameSession,
+  LanguageId,
+  PassPhonePhase,
+  PassPhoneRoundRecord,
+  PassPhoneState,
   Player,
   PlayerResponse,
   Question,
+  RevealAction,
   RoundAnswer,
   SessionStatus,
   SessionType,
@@ -26,6 +38,7 @@ import { generateResponseId, getQuestionIdentity } from '@/utils';
 const INITIAL_SESSION: GameSession = {
   id: null,
   sessionType: 'standard',
+  language: 'en',
   status: 'idle',
   vibeId: null,
   gameModeId: 'all',
@@ -37,6 +50,7 @@ const INITIAL_SESSION: GameSession = {
   answers: [],
   currentPlayerIndex: 0,
   responses: [],
+  passPhoneState: undefined,
 };
 
 // ─── Store Interface ──────────────────────────────────────────────────────────
@@ -49,8 +63,11 @@ interface GameState {
 }
 
 interface GameActions {
-  /** Set session type ('standard' for single vote vs 'group' for pass-the-phone multi-response) */
+  /** Set session type ('standard' for single vote vs 'group' for secret polling vs 'pass-the-phone' for target challenge) */
   setSessionType: (sessionType: SessionType) => void;
+
+  /** Set session language ('en' | 'tr' | 'fr' | 'ar') */
+  setLanguage: (language: LanguageId) => void;
 
   /** Set the chosen vibe before starting a session */
   setVibe: (vibeId: VibeId) => void;
@@ -80,6 +97,19 @@ interface GameActions {
       | { responseType: 'discussion'; confirmed?: boolean }
   ) => Promise<{ isQuestionComplete: boolean }>;
 
+  // ─── Pass The Phone State Machine Actions ──────────────────────────────────
+  /** Step 1: Active selector picks target player */
+  selectPassPhoneTarget: (targetPlayerId: string) => void;
+
+  /** Step 2: Target confirms receipt of device */
+  confirmPassPhoneHandover: () => void;
+
+  /** Step 3: Target commits an action (take-shot or show-question) */
+  commitPassPhoneAction: (action: RevealAction) => Promise<{ isRoundComplete: boolean }>;
+
+  /** Step 4: Acknowledge reveal and advance to next round */
+  acknowledgePassPhoneRevealAndAdvance: () => Promise<void>;
+
   /** Replays the game with the same vibe, players, and session type while avoiding seen questions */
   replayGame: () => Promise<void>;
 
@@ -100,6 +130,11 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
   setSessionType: (sessionType) =>
     set((state) => ({
       session: { ...state.session, sessionType },
+    })),
+
+  setLanguage: (language) =>
+    set((state) => ({
+      session: { ...state.session, language },
     })),
 
   setVibe: (vibeId) =>
@@ -130,9 +165,14 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
 
     const selectedMode = session.gameModeId || 'all';
     const selectedSessionType = session.sessionType || 'standard';
+    const language = session.language || 'en';
 
-    // 1. Instant launch with static curated questions + cross-session history
-    const staticQuestions = await defaultContentProvider.getQuestions();
+    // 1. Instant launch with static curated questions in requested language + cross-session history
+    const staticQuestions = await defaultContentProvider.getQuestions({
+      language,
+      vibeId: session.vibeId,
+      gameModeId: selectedMode !== 'all' ? selectedMode : undefined,
+    });
     const newSession = startNewSession({
       vibeId: session.vibeId,
       players: session.players,
@@ -144,9 +184,14 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
 
     const populatedSession: GameSession = {
       ...newSession,
+      language,
       sessionType: selectedSessionType,
       currentPlayerIndex: 0,
       responses: [],
+      passPhoneState:
+        selectedSessionType === 'pass-the-phone'
+          ? initPassPhoneState(session.players)
+          : undefined,
     };
 
     const updatedIdentities = populatedSession.currentQuestion
@@ -159,11 +204,12 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       seenQuestionIdentities: updatedIdentities,
     });
 
-    // 2. Asynchronous background AI question synthesis (Mode-Aware)
+    // 2. Asynchronous background AI question synthesis (Language & Mode-Aware)
     const vibeId = session.vibeId;
     const players = session.players;
     defaultContentProvider
       .getPersonalizedQuestions({
+        language,
         vibeId,
         players,
         gameModeId: selectedMode,
@@ -199,7 +245,9 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     };
 
     const pool =
-      questionPool.length > 0 ? questionPool : await defaultContentProvider.getQuestions();
+      questionPool.length > 0
+        ? questionPool
+        : await defaultContentProvider.getQuestions({ language: session.language || 'en' });
     const advancedSession = advanceSessionRound(
       session,
       answer,
@@ -290,6 +338,121 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     return { isQuestionComplete: true };
   },
 
+  // ─── Pass The Phone Action Implementations ─────────────────────────────────
+
+  selectPassPhoneTarget: (targetPlayerId) => {
+    const { session } = get();
+    if (!session.passPhoneState || session.status !== 'playing') return;
+
+    const nextSession = selectPassPhoneTarget(session, targetPlayerId);
+    set({ session: nextSession });
+  },
+
+  confirmPassPhoneHandover: () => {
+    const { session } = get();
+    if (!session.passPhoneState || session.status !== 'playing') return;
+
+    const nextSession = confirmPassPhoneHandover(session);
+    set({ session: nextSession });
+  },
+
+  commitPassPhoneAction: async (action) => {
+    const { session, questionPool, seenQuestionIdentities } = get();
+    if (!session.passPhoneState || session.status !== 'playing') {
+      return { isRoundComplete: false };
+    }
+
+    const { nextSession, isRoundComplete } = commitPassPhoneAction(session, action);
+
+    if (!isRoundComplete) {
+      // Transitioned to REVEALING_QUESTION
+      set({ session: nextSession });
+      return { isRoundComplete: false };
+    }
+
+    // 'take-shot' committed -> round completed immediately
+    if (session.currentRound >= session.totalRounds) {
+      // Game session complete
+      const finalSession: GameSession = {
+        ...nextSession,
+        status: 'completed',
+        passPhoneState: {
+          ...nextSession.passPhoneState!,
+          phase: 'SESSION_COMPLETE',
+        },
+      };
+      set({ session: finalSession });
+      return { isRoundComplete: true };
+    }
+
+    // Pick next question and advance round
+    const pool =
+      questionPool.length > 0 ? questionPool : await defaultContentProvider.getQuestions();
+    const nextQuestion = session.vibeId
+      ? selectNextQuestion(
+          pool,
+          nextSession.usedQuestionIds,
+          session.vibeId,
+          session.gameModeId || 'all',
+          seenQuestionIdentities
+        )
+      : null;
+
+    const advancedSession = advancePassPhoneRound(nextSession, nextQuestion);
+    const nextIdentities = nextQuestion
+      ? [...seenQuestionIdentities, getQuestionIdentity(nextQuestion)]
+      : seenQuestionIdentities;
+
+    set({
+      session: advancedSession,
+      seenQuestionIdentities: nextIdentities,
+    });
+
+    return { isRoundComplete: true };
+  },
+
+  acknowledgePassPhoneRevealAndAdvance: async () => {
+    const { session, questionPool, seenQuestionIdentities } = get();
+    if (!session.passPhoneState || session.status !== 'playing') return;
+
+    const acknowledgedSession = acknowledgePassPhoneReveal(session);
+
+    if (session.currentRound >= session.totalRounds) {
+      const finalSession: GameSession = {
+        ...acknowledgedSession,
+        status: 'completed',
+        passPhoneState: {
+          ...acknowledgedSession.passPhoneState!,
+          phase: 'SESSION_COMPLETE',
+        },
+      };
+      set({ session: finalSession });
+      return;
+    }
+
+    const pool =
+      questionPool.length > 0 ? questionPool : await defaultContentProvider.getQuestions();
+    const nextQuestion = session.vibeId
+      ? selectNextQuestion(
+          pool,
+          acknowledgedSession.usedQuestionIds,
+          session.vibeId,
+          session.gameModeId || 'all',
+          seenQuestionIdentities
+        )
+      : null;
+
+    const advancedSession = advancePassPhoneRound(acknowledgedSession, nextQuestion);
+    const nextIdentities = nextQuestion
+      ? [...seenQuestionIdentities, getQuestionIdentity(nextQuestion)]
+      : seenQuestionIdentities;
+
+    set({
+      session: advancedSession,
+      seenQuestionIdentities: nextIdentities,
+    });
+  },
+
   replayGame: async () => {
     const { session, seenQuestionIdentities } = get();
     if (!session.vibeId || session.players.length < 2) {
@@ -298,7 +461,12 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
 
     const selectedMode = session.gameModeId || 'all';
     const selectedSessionType = session.sessionType || 'standard';
-    const staticQuestions = await defaultContentProvider.getQuestions();
+    const language = session.language || 'en';
+    const staticQuestions = await defaultContentProvider.getQuestions({
+      language,
+      vibeId: session.vibeId,
+      gameModeId: selectedMode !== 'all' ? selectedMode : undefined,
+    });
     const replayedSession = replaySession(
       session,
       staticQuestions,
@@ -308,9 +476,14 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
 
     const populatedSession: GameSession = {
       ...replayedSession,
+      language,
       sessionType: selectedSessionType,
       currentPlayerIndex: 0,
       responses: [],
+      passPhoneState:
+        selectedSessionType === 'pass-the-phone'
+          ? initPassPhoneState(session.players)
+          : undefined,
     };
 
     const updatedIdentities = populatedSession.currentQuestion
@@ -323,11 +496,12 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       seenQuestionIdentities: updatedIdentities,
     });
 
-    // Background prefetch for new replay session (Mode-Aware)
+    // Background prefetch for new replay session (Language & Mode-Aware)
     const vibeId = session.vibeId;
     const players = session.players;
     defaultContentProvider
       .getPersonalizedQuestions({
+        language,
         vibeId,
         players,
         gameModeId: selectedMode,
@@ -358,6 +532,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
 // ─── Atomic Selector Hooks (100% stable references) ───────────────────────────
 
 export const useGameSession = () => useGameStore((s) => s.session);
+export const useLanguage = () => useGameStore((s) => s.session.language || 'en');
 export const useSessionStatus = () => useGameStore((s) => s.session.status);
 export const useSessionType = () => useGameStore((s) => s.session.sessionType);
 export const useSelectedVibe = () => useGameStore((s) => s.session.vibeId);
@@ -378,14 +553,44 @@ export const useCurrentAnsweringPlayer = () =>
 export const useGroupResponses = () =>
   useGameStore((s) => s.session.responses || []);
 
+// Pass The Phone Selectors
+export const usePassPhoneState = (): PassPhoneState | undefined =>
+  useGameStore((s) => s.session.passPhoneState);
+export const usePassPhonePhase = (): PassPhonePhase =>
+  useGameStore((s) => s.session.passPhoneState?.phase || 'SELECTING_TARGET');
+export const usePassPhoneSelector = (): Player =>
+  useGameStore(
+    (s) =>
+      s.session.players.find(
+        (p) => p.id === s.session.passPhoneState?.activeSelectorPlayerId
+      ) || s.session.players[0]
+  );
+export const usePassPhoneTarget = (): Player | null =>
+  useGameStore(
+    (s) =>
+      s.session.players.find(
+        (p) => p.id === s.session.passPhoneState?.selectedTargetPlayerId
+      ) || null
+  );
+export const usePassPhoneShots = (): number =>
+  useGameStore((s) => s.session.passPhoneState?.shotsCount ?? 0);
+export const usePassPhoneRounds = (): PassPhoneRoundRecord[] =>
+  useGameStore((s) => s.session.passPhoneState?.roundHistory || []);
+
 // Action hooks with stable references
 export const useSetSessionType = () => useGameStore((s) => s.setSessionType);
+export const useSetLanguage = () => useGameStore((s) => s.setLanguage);
 export const useSetVibe = () => useGameStore((s) => s.setVibe);
 export const useSetPlayers = () => useGameStore((s) => s.setPlayers);
 export const useSetGameMode = () => useGameStore((s) => s.setGameMode);
 export const useStartGame = () => useGameStore((s) => s.startGame);
 export const useAnswerAndAdvance = () => useGameStore((s) => s.submitAnswerAndAdvance);
 export const useSubmitPlayerResponse = () => useGameStore((s) => s.submitPlayerResponse);
+export const useSelectPassPhoneTarget = () => useGameStore((s) => s.selectPassPhoneTarget);
+export const useConfirmPassPhoneHandover = () => useGameStore((s) => s.confirmPassPhoneHandover);
+export const useCommitPassPhoneAction = () => useGameStore((s) => s.commitPassPhoneAction);
+export const useAcknowledgePassPhoneReveal = () =>
+  useGameStore((s) => s.acknowledgePassPhoneRevealAndAdvance);
 export const useReplayGame = () => useGameStore((s) => s.replayGame);
 export const useResetSession = () => useGameStore((s) => s.resetSession);
 export const useClearQuestionHistory = () => useGameStore((s) => s.clearQuestionHistory);

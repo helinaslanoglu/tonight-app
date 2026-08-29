@@ -3,5 +3,6 @@
  */
 export * from './game-engine';
 export * from './interaction-resolver';
+export * from './pass-phone-engine';
 export * from './response-engine';
 export * from './results-engine';

@@ -64,6 +64,7 @@ export interface BaseQuestion {
   id: string;
   text: string;
   vibeId: VibeId;
+  language?: LanguageId;
 }
 
 export interface WouldYouRatherQuestion extends BaseQuestion {
@@ -168,18 +169,68 @@ export type PlayerResponse =
 // ─── Session Types ────────────────────────────────────────────────────────────
 
 /**
- * Session type determines HOW the session collects responses:
+ * Session type determines HOW the entire gameplay loop collects and orchestrates responses:
  * - 'standard': Single collective answer/vote per round.
- * - 'group': Pass-the-phone sequential individual responses from every player.
+ * - 'group': Everyone answers independently via pass-the-phone.
+ * - 'pass-the-phone': Party game loop where active selector targets a player, and target takes an action or reveals question.
  */
-export type SessionType = 'standard' | 'group';
+export type SessionType = 'standard' | 'group' | 'pass-the-phone';
 
 /** Lifecycle state of a game session. */
 export type SessionStatus = 'idle' | 'setup' | 'playing' | 'completed';
 
+// ─── Pass The Phone State Machine Domain Types ────────────────────────────────
+
+export type PassPhonePhase =
+  | 'SELECTING_TARGET'    // Active selector reads question and selects target player
+  | 'PASSING_PHONE'       // Device is handed to target; question is strictly hidden
+  | 'TARGET_ACTION'       // Target sees action choice (e.g. TAKE THE SHOT vs SHOW QUESTION)
+  | 'REVEALING_QUESTION'  // Question & selector are revealed
+  | 'ROUND_COMPLETE'      // Round finished; ready for next round
+  | 'SESSION_COMPLETE';   // All rounds finished; results ready
+
+export type RevealAction =
+  | 'take-shot'
+  | 'show-question'
+  | 'take-sip'
+  | 'do-dare'
+  | 'skip';
+
+export interface PassPhoneRoundRecord {
+  roundNumber: number;
+  questionId: string;
+  questionText: string;
+  selectorPlayerId: string;
+  targetPlayerId: string;
+  action: RevealAction;
+  timestamp: number;
+}
+
+export interface PassPhoneState {
+  phase: PassPhonePhase;
+  activeSelectorPlayerId: string;
+  selectedTargetPlayerId?: string;
+  selectedAction?: RevealAction;
+  shotsCount: number;
+  roundHistory: PassPhoneRoundRecord[];
+}
+
+// ─── Language & Localization ──────────────────────────────────────────────────
+
+export type LanguageId = 'en' | 'tr' | 'fr' | 'ar';
+
+export interface LanguageDefinition {
+  id: LanguageId;
+  label: string;
+  nativeLabel: string;
+  flag: string;
+  direction: 'ltr' | 'rtl';
+}
+
 export interface GameSession {
   id: string | null;
   sessionType: SessionType;
+  language: LanguageId;
   status: SessionStatus;
   vibeId: VibeId | null;
   gameModeId: GameModeId | 'all' | null;
@@ -194,6 +245,25 @@ export interface GameSession {
   currentPlayerIndex?: number;
   /** Group Session raw response store: all individual player responses */
   responses?: PlayerResponse[];
+  /** Pass The Phone session state machine */
+  passPhoneState?: PassPhoneState;
+}
+
+// ─── Pass The Phone Results Model ─────────────────────────────────────────────
+
+export interface PassPhoneResult {
+  sessionId: string;
+  vibeId: VibeId;
+  totalRounds: number;
+  totalShots: number;
+  players: Player[];
+  mostTargetedPlayer: { playerId: string; name: string; count: number } | null;
+  mostFrequentSelector: { playerId: string; name: string; count: number } | null;
+  actionDistribution: Record<RevealAction, number>;
+  /** Relationship matrix: fromSelectorId -> toTargetId -> count */
+  relationshipMatrix: Record<string, Record<string, number>>;
+  rounds: PassPhoneRoundRecord[];
+  completedAt: string;
 }
 
 // ─── Game Result / Summary / Insights (Standard Mode) ─────────────────────────

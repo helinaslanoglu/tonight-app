@@ -10,13 +10,41 @@
  *    WYR must contain two distinct options).
  */
 
-import type { Question, WouldYouRatherQuestion } from '@/types';
+import type { LanguageId, Question, WouldYouRatherQuestion } from '@/types';
 import type { AIValidationResult } from './types';
 
 const MIN_QUESTION_LENGTH = 10;
 const MAX_QUESTION_LENGTH = 250;
 const MIN_OPTION_LENGTH = 2;
 const MAX_OPTION_LENGTH = 100;
+
+/**
+ * Validates that text adheres to the expected language script.
+ */
+export function validateLanguageScript(
+  text: string,
+  expectedLanguage?: LanguageId
+): { isValid: boolean; reason?: string } {
+  if (!expectedLanguage) return { isValid: true };
+
+  const hasArabicChars = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(text);
+
+  if (expectedLanguage === 'ar') {
+    if (!hasArabicChars) {
+      return { isValid: false, reason: 'Expected Arabic text, but no Arabic script detected' };
+    }
+  } else {
+    // Non-Arabic language (en, tr, fr) must not be predominantly Arabic script
+    if (hasArabicChars) {
+      return {
+        isValid: false,
+        reason: `Mismatched script: Found Arabic script when expecting "${expectedLanguage}"`,
+      };
+    }
+  }
+
+  return { isValid: true };
+}
 
 /**
  * Sanitizes a string by stripping leading/trailing whitespace and surrounding quotation marks.
@@ -32,7 +60,10 @@ export function sanitizeString(input: unknown): string {
 /**
  * Validates and sanitizes a raw question object from any AI source.
  */
-export function validateAndSanitizeQuestion(raw: unknown): AIValidationResult {
+export function validateAndSanitizeQuestion(
+  raw: unknown,
+  expectedLanguage?: LanguageId
+): AIValidationResult {
   if (!raw || typeof raw !== 'object') {
     return { isValid: false, reason: 'Payload is not an object' };
   }
@@ -46,6 +77,12 @@ export function validateAndSanitizeQuestion(raw: unknown): AIValidationResult {
   }
   if (cleanText.length > MAX_QUESTION_LENGTH) {
     return { isValid: false, reason: `Question text too long (>${MAX_QUESTION_LENGTH} chars)` };
+  }
+
+  // Language script validation
+  const langCheck = validateLanguageScript(cleanText, expectedLanguage);
+  if (!langCheck.isValid) {
+    return { isValid: false, reason: langCheck.reason };
   }
 
   // 2. Validate vibeId
@@ -76,10 +113,13 @@ export function validateAndSanitizeQuestion(raw: unknown): AIValidationResult {
       return { isValid: false, reason: 'Option A and Option B cannot be identical' };
     }
 
+    const qLang = (q.language as LanguageId) || expectedLanguage || 'en';
+
     const sanitizedWYR: WouldYouRatherQuestion = {
       id,
       vibeId: q.vibeId as Question['vibeId'],
       gameModeId: 'would-you-rather',
+      language: qLang,
       text: cleanText,
       optionA: cleanOptionA,
       optionB: cleanOptionB,
@@ -88,12 +128,14 @@ export function validateAndSanitizeQuestion(raw: unknown): AIValidationResult {
     return { isValid: true, sanitizedQuestion: sanitizedWYR };
   }
 
+  const qLang = (q.language as LanguageId) || expectedLanguage || 'en';
+
   // ─── Most Likely To ──────────────────────────────────────────────────────────
   if (mode === 'most-likely-to') {
-    // Semantic validation: MLT questions MUST prompt for player selection
-    const hasPlayerSelectionIntent = /\b(who|most likely|who would|who is|who in|between)\b/i.test(
-      cleanText
-    );
+    // Semantic validation: MLT questions MUST prompt for player selection (supports en, tr, fr, ar)
+    const hasPlayerSelectionIntent =
+      /\b(who|most likely|who would|who is|who in|between|kim|qui|quel|quelle)\b/i.test(cleanText) ||
+      /(من|أيهما)/.test(cleanText);
     if (!hasPlayerSelectionIntent) {
       return {
         isValid: false,
@@ -107,6 +149,7 @@ export function validateAndSanitizeQuestion(raw: unknown): AIValidationResult {
         id,
         vibeId: q.vibeId as Question['vibeId'],
         gameModeId: 'most-likely-to',
+        language: qLang,
         text: cleanText,
       },
     };
@@ -121,6 +164,7 @@ export function validateAndSanitizeQuestion(raw: unknown): AIValidationResult {
         id,
         vibeId: q.vibeId as Question['vibeId'],
         gameModeId: 'open-question',
+        language: qLang,
         text: cleanText,
         prompt: cleanPrompt && cleanPrompt.length > 0 ? cleanPrompt : undefined,
       },
@@ -138,6 +182,7 @@ export function validateAndSanitizeQuestion(raw: unknown): AIValidationResult {
         id,
         vibeId: q.vibeId as Question['vibeId'],
         gameModeId: 'hot-take',
+        language: qLang,
         text: cleanText,
         agreeLabel: cleanAgree && cleanAgree.length > 0 ? cleanAgree : 'AGREE',
         disagreeLabel: cleanDisagree && cleanDisagree.length > 0 ? cleanDisagree : 'DISAGREE',
@@ -154,6 +199,7 @@ export function validateAndSanitizeQuestion(raw: unknown): AIValidationResult {
         id,
         vibeId: q.vibeId as Question['vibeId'],
         gameModeId: 'who-knows-me-best',
+        language: qLang,
         text: cleanText,
         prompt: cleanPrompt && cleanPrompt.length > 0 ? cleanPrompt : undefined,
       },

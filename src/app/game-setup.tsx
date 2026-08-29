@@ -16,15 +16,18 @@ import { Badge } from '@/components/ui/Badge';
 import { IconButton } from '@/components/ui/IconButton';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { VIBES } from '@/data';
+import { isRTL, LANGUAGES, t } from '@/services/i18n';
 import {
+  useLanguage,
   usePlayers,
   useSelectedVibe,
   useSessionType,
+  useSetLanguage,
   useSetPlayers,
   useSetSessionType,
 } from '@/store';
 import { getVibeColor, theme } from '@/theme';
-import type { Player, SessionType } from '@/types';
+import type { LanguageId, Player, SessionType } from '@/types';
 import { generatePlayerId, haptic } from '@/utils';
 
 const PLAYER_COUNT_OPTIONS = [2, 3, 4, 5, 6] as const;
@@ -43,9 +46,11 @@ export default function GameSetupScreen() {
   const router = useRouter();
   const selectedVibeId = useSelectedVibe();
   const currentSessionType = useSessionType();
+  const activeLanguage = useLanguage();
   const existingPlayers = usePlayers();
   const setPlayers = useSetPlayers();
   const setSessionType = useSetSessionType();
+  const setLanguage = useSetLanguage();
 
   const [sessionType, setLocalSessionType] = useState<SessionType>(
     currentSessionType || 'group'
@@ -53,6 +58,7 @@ export default function GameSetupScreen() {
 
   const activeVibe = VIBES.find((v) => v.id === selectedVibeId);
   const vibeColor = selectedVibeId ? getVibeColor(selectedVibeId) : theme.colors.accent;
+  const rtl = isRTL(activeLanguage);
 
   // Determine initial count from existing players (defaults to 4)
   const initialCount = (
@@ -97,21 +103,21 @@ export default function GameSetupScreen() {
     return activeNames.map((name, index) => {
       const trimmed = name.trim();
       if (touched[index] && trimmed.length === 0) {
-        return 'Name is required';
+        return t('setup.nameRequired', activeLanguage);
       }
       if (trimmed.length > 20) {
-        return 'Max 20 characters';
+        return t('setup.maxCharacters', activeLanguage);
       }
       // Check for duplicate names
       const duplicateCount = activeNames.filter(
         (n) => n.trim().toLowerCase() === trimmed.toLowerCase() && trimmed.length > 0
       ).length;
       if (duplicateCount > 1) {
-        return 'Name must be unique';
+        return t('setup.uniqueNameRequired', activeLanguage);
       }
       return undefined;
     });
-  }, [activeNames, touched]);
+  }, [activeNames, touched, activeLanguage]);
 
   // Overall form validity
   const isFormValid = useMemo(() => {
@@ -145,14 +151,14 @@ export default function GameSetupScreen() {
     <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
       <ScreenContainer scrollable avoidKeyboard contentStyle={styles.container}>
         {/* Top Navigation & Vibe Badge */}
-        <View style={styles.navBar}>
+        <View style={[styles.navBar, rtl && styles.navBarRTL]}>
           <IconButton
             variant="surface"
             size="sm"
             onPress={() => router.back()}
             accessibilityLabel="Go back to vibe selection"
           >
-            <AppText style={styles.backArrow}>←</AppText>
+            <AppText style={styles.backArrow}>{rtl ? '→' : '←'}</AppText>
           </IconButton>
 
           {activeVibe ? (
@@ -166,20 +172,78 @@ export default function GameSetupScreen() {
 
         {/* Screen Header */}
         <Animated.View entering={FadeIn.duration(400)} style={styles.header}>
-          <AppText variant="heading" style={styles.title}>
-            Who&apos;s playing?
+          <AppText
+            variant="heading"
+            style={[styles.title, rtl && styles.textRTL]}
+          >
+            {t('setup.headerTitle', activeLanguage)}
           </AppText>
-          <AppText variant="body" color="secondary" style={styles.subtitle}>
-            Add everyone joining tonight and pick your session style.
+          <AppText
+            variant="body"
+            color="secondary"
+            style={[styles.subtitle, rtl && styles.textRTL]}
+          >
+            {t('setup.headerSubtitle', activeLanguage)}
           </AppText>
+        </Animated.View>
+
+        {/* Language Selector Section */}
+        <Animated.View entering={FadeIn.duration(410)} style={styles.section}>
+          <AppText
+            variant="overline"
+            color="secondary"
+            style={[styles.sectionLabel, rtl && styles.textRTL]}
+          >
+            {t('setup.languageLabel', activeLanguage)}
+          </AppText>
+          <View style={[styles.languageGrid, rtl && styles.rowRTL]}>
+            {LANGUAGES.map((lang) => {
+              const isSelected = activeLanguage === lang.id;
+              return (
+                <Pressable
+                  key={lang.id}
+                  onPress={() => {
+                    haptic.selection().catch(() => {});
+                    setLanguage(lang.id as LanguageId);
+                  }}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: isSelected }}
+                  accessibilityLabel={`${lang.label} (${lang.nativeLabel})`}
+                  style={({ pressed }) => [
+                    styles.languagePill,
+                    isSelected
+                      ? [styles.languagePillSelected, { borderColor: vibeColor }]
+                      : styles.languagePillUnselected,
+                    pressed && styles.cardPressed,
+                  ]}
+                >
+                  <AppText style={styles.flagEmoji}>{lang.flag}</AppText>
+                  <AppText
+                    variant="label"
+                    style={[
+                      styles.languagePillText,
+                      isSelected && { color: vibeColor, fontWeight: '700' },
+                    ]}
+                  >
+                    {lang.nativeLabel}
+                  </AppText>
+                </Pressable>
+              );
+            })}
+          </View>
         </Animated.View>
 
         {/* Session Type Switcher */}
         <Animated.View entering={FadeIn.duration(420)} style={styles.sessionTypeSection}>
-          <AppText variant="overline" color="secondary" style={styles.sectionLabel}>
-            SESSION TYPE
+          <AppText
+            variant="overline"
+            color="secondary"
+            style={[styles.sectionLabel, rtl && styles.textRTL]}
+          >
+            {t('setup.sessionTypeLabel', activeLanguage)}
           </AppText>
-          <View style={styles.sessionTypeGrid}>
+          <View style={styles.sessionTypeColumn}>
+            {/* 1. Group Session */}
             <Pressable
               onPress={() => {
                 haptic.selection().catch(() => {});
@@ -187,7 +251,7 @@ export default function GameSetupScreen() {
               }}
               accessibilityRole="radio"
               accessibilityState={{ selected: sessionType === 'group' }}
-              accessibilityLabel="Group Session. Pass the phone so everyone answers secretly."
+              accessibilityLabel="Group Session"
               style={({ pressed }) => [
                 styles.sessionTypeCard,
                 sessionType === 'group'
@@ -196,23 +260,82 @@ export default function GameSetupScreen() {
                 pressed && styles.cardPressed,
               ]}
             >
-              <View style={styles.sessionTypeHeader}>
+              <View style={[styles.sessionTypeHeader, rtl && styles.rowRTL]}>
                 <AppText style={styles.sessionTypeIcon}>👥</AppText>
                 <AppText
                   variant="label"
                   style={[
                     styles.sessionTypeTitle,
                     sessionType === 'group' && { color: vibeColor },
+                    rtl && styles.textRTL,
                   ]}
                 >
-                  Group Session
+                  {t('sessionType.group.title', activeLanguage)}
                 </AppText>
+                {sessionType === 'group' && (
+                  <Badge
+                    label={t('sessionType.group.badge', activeLanguage)}
+                    color={theme.colors.surfaceElevated}
+                    textColor={vibeColor}
+                  />
+                )}
               </View>
-              <AppText variant="caption" color="secondary" style={styles.sessionTypeDesc}>
-                Pass the phone. Everyone answers secretly &amp; privately.
+              <AppText
+                variant="caption"
+                color="secondary"
+                style={[styles.sessionTypeDesc, rtl && styles.textRTL]}
+              >
+                {t('sessionType.group.desc', activeLanguage)}
               </AppText>
             </Pressable>
 
+            {/* 2. Pass The Phone */}
+            <Pressable
+              onPress={() => {
+                haptic.selection().catch(() => {});
+                setLocalSessionType('pass-the-phone');
+              }}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: sessionType === 'pass-the-phone' }}
+              accessibilityLabel="Pass The Phone"
+              style={({ pressed }) => [
+                styles.sessionTypeCard,
+                sessionType === 'pass-the-phone'
+                  ? [styles.sessionTypeCardSelected, { borderColor: vibeColor }]
+                  : styles.sessionTypeCardUnselected,
+                pressed && styles.cardPressed,
+              ]}
+            >
+              <View style={[styles.sessionTypeHeader, rtl && styles.rowRTL]}>
+                <AppText style={styles.sessionTypeIcon}>📱</AppText>
+                <AppText
+                  variant="label"
+                  style={[
+                    styles.sessionTypeTitle,
+                    sessionType === 'pass-the-phone' && { color: vibeColor },
+                    rtl && styles.textRTL,
+                  ]}
+                >
+                  {t('sessionType.passPhone.title', activeLanguage)}
+                </AppText>
+                {sessionType === 'pass-the-phone' && (
+                  <Badge
+                    label={t('sessionType.passPhone.badge', activeLanguage)}
+                    color={theme.colors.surfaceElevated}
+                    textColor={vibeColor}
+                  />
+                )}
+              </View>
+              <AppText
+                variant="caption"
+                color="secondary"
+                style={[styles.sessionTypeDesc, rtl && styles.textRTL]}
+              >
+                {t('sessionType.passPhone.desc', activeLanguage)}
+              </AppText>
+            </Pressable>
+
+            {/* 3. Standard Game */}
             <Pressable
               onPress={() => {
                 haptic.selection().catch(() => {});
@@ -220,7 +343,7 @@ export default function GameSetupScreen() {
               }}
               accessibilityRole="radio"
               accessibilityState={{ selected: sessionType === 'standard' }}
-              accessibilityLabel="Standard Game. Quick party play where the group answers together."
+              accessibilityLabel="Standard Game"
               style={({ pressed }) => [
                 styles.sessionTypeCard,
                 sessionType === 'standard'
@@ -229,20 +352,25 @@ export default function GameSetupScreen() {
                 pressed && styles.cardPressed,
               ]}
             >
-              <View style={styles.sessionTypeHeader}>
+              <View style={[styles.sessionTypeHeader, rtl && styles.rowRTL]}>
                 <AppText style={styles.sessionTypeIcon}>⚡</AppText>
                 <AppText
                   variant="label"
                   style={[
                     styles.sessionTypeTitle,
                     sessionType === 'standard' && { color: vibeColor },
+                    rtl && styles.textRTL,
                   ]}
                 >
-                  Standard Game
+                  {t('sessionType.standard.title', activeLanguage)}
                 </AppText>
               </View>
-              <AppText variant="caption" color="secondary" style={styles.sessionTypeDesc}>
-                Quick party game. Group discusses and answers together.
+              <AppText
+                variant="caption"
+                color="secondary"
+                style={[styles.sessionTypeDesc, rtl && styles.textRTL]}
+              >
+                {t('sessionType.standard.desc', activeLanguage)}
               </AppText>
             </Pressable>
           </View>
@@ -250,10 +378,14 @@ export default function GameSetupScreen() {
 
         {/* Player Count Selector */}
         <Animated.View entering={FadeIn.duration(450)} style={styles.countSection}>
-          <AppText variant="overline" color="secondary" style={styles.sectionLabel}>
-            NUMBER OF PLAYERS
+          <AppText
+            variant="overline"
+            color="secondary"
+            style={[styles.sectionLabel, rtl && styles.textRTL]}
+          >
+            {t('setup.playerCountLabel', activeLanguage)}
           </AppText>
-          <View style={styles.pillRow}>
+          <View style={[styles.pillRow, rtl && styles.rowRTL]}>
             {PLAYER_COUNT_OPTIONS.map((count) => {
               const isSelected = playerCount === count;
               return (
@@ -266,21 +398,22 @@ export default function GameSetupScreen() {
                   accessibilityRole="radio"
                   accessibilityState={{ selected: isSelected }}
                   accessibilityLabel={`${count} players`}
-                  accessibilityHint="Selects number of players to join the game"
                   style={({ pressed }) => [
-                    styles.countPill,
-                    isSelected ? styles.countPillSelected : styles.countPillUnselected,
-                    pressed && styles.countPillPressed,
+                    styles.pill,
+                    isSelected
+                      ? [styles.pillSelected, { backgroundColor: vibeColor }]
+                      : styles.pillUnselected,
+                    pressed && styles.pillPressed,
                   ]}
                 >
                   <AppText
                     variant="label"
                     style={[
-                      styles.countPillText,
-                      isSelected && styles.countPillTextSelected,
+                      styles.pillText,
+                      isSelected ? styles.pillTextSelected : styles.pillTextUnselected,
                     ]}
                   >
-                    {count === 6 ? '6+' : count}
+                    {count}
                   </AppText>
                 </Pressable>
               );
@@ -289,49 +422,50 @@ export default function GameSetupScreen() {
         </Animated.View>
 
         {/* Dynamic Player Name Inputs */}
-        <View style={styles.inputsList}>
+        <Animated.View entering={FadeIn.duration(500)} style={styles.inputsSection}>
           {Array.from({ length: playerCount }).map((_, index) => {
+            const avatarColor = AVATAR_COLORS[index % AVATAR_COLORS.length];
             const error = validationErrors[index];
-            const playerColor = AVATAR_COLORS[index % AVATAR_COLORS.length];
 
             return (
-              <Animated.View
-                key={index}
-                entering={FadeIn.duration(350)}
-                style={styles.inputItem}
-              >
+              <View key={`player-input-${index}`} style={styles.inputWrapper}>
                 <AppTextInput
-                  label={`Player ${index + 1}`}
-                  placeholder={`Enter name for Player ${index + 1}`}
                   value={playerNames[index] || ''}
                   onChangeText={(text) => handleNameChange(text, index)}
                   onBlur={() => handleBlur(index)}
-                  error={error}
+                  placeholder={t('setup.playerInputPlaceholder', activeLanguage, {
+                    index: index + 1,
+                  })}
                   maxLength={20}
-                  autoCapitalize="words"
-                  autoCorrect={false}
-                  returnKeyType={index === playerCount - 1 ? 'done' : 'next'}
+                  error={error}
+                  accessibilityLabel={`Name for Player ${index + 1}`}
                   leftIcon={
-                    <View style={[styles.avatarDot, { backgroundColor: playerColor }]} />
+                    <View
+                      style={[styles.avatarIndicator, { backgroundColor: avatarColor }]}
+                    >
+                      <AppText style={styles.avatarNumber}>{index + 1}</AppText>
+                    </View>
                   }
+                  containerStyle={styles.textInputContainer}
                 />
-              </Animated.View>
+              </View>
             );
           })}
-        </View>
+        </Animated.View>
 
         {/* Bottom CTA Button */}
-        <Animated.View entering={FadeIn.duration(400)} style={styles.bottomArea}>
+        <View style={styles.bottomCta}>
           <AppButton
+            variant="primary"
             size="lg"
-            fullWidth
             disabled={!isFormValid}
             onPress={handleContinue}
-            style={isFormValid ? styles.startButtonActive : undefined}
+            accessibilityHint="Proceeds to choose a game mode"
+            style={[styles.ctaButton, isFormValid && { backgroundColor: vibeColor }]}
           >
-            CHOOSE GAME MODE
+            {t('setup.chooseModeCta', activeLanguage)}
           </AppButton>
-        </Animated.View>
+        </View>
       </ScreenContainer>
     </TouchableWithoutFeedback>
   );
@@ -345,122 +479,174 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: theme.spacing.sm,
+    marginBottom: theme.spacing.lg,
+  },
+  navBarRTL: {
+    flexDirection: 'row-reverse',
   },
   backArrow: {
-    fontSize: 18,
-    lineHeight: 20,
+    fontSize: theme.typography.size.md,
     color: theme.colors.text.primary,
   },
   header: {
-    marginBottom: theme.spacing.md,
+    marginBottom: theme.spacing.lg,
   },
   title: {
-    color: theme.colors.text.primary,
-    fontSize: theme.typography.size['3xl'],
+    marginBottom: theme.spacing.xs,
   },
   subtitle: {
-    marginTop: theme.spacing.xs,
+    lineHeight: 22,
+  },
+  textRTL: {
+    textAlign: 'right',
+    writingDirection: 'rtl',
+  },
+  rowRTL: {
+    flexDirection: 'row-reverse',
+  },
+  section: {
+    marginBottom: theme.spacing.lg,
+  },
+  sectionLabel: {
+    marginBottom: theme.spacing.sm,
+    letterSpacing: 1.5,
+  },
+  languageGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.spacing.sm,
+  },
+  languagePill: {
+    flex: 1,
+    minWidth: '45%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
+    borderRadius: theme.radius.md,
+    borderWidth: 1.5,
+    gap: theme.spacing.xs,
+  },
+  languagePillSelected: {
+    backgroundColor: theme.colors.surfaceElevated,
+  },
+  languagePillUnselected: {
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border,
+  },
+  flagEmoji: {
+    fontSize: 16,
+  },
+  languagePillText: {
+    fontSize: theme.typography.size.sm,
+    color: theme.colors.text.primary,
   },
   sessionTypeSection: {
     marginBottom: theme.spacing.lg,
   },
-  sessionTypeGrid: {
-    flexDirection: 'row',
+  sessionTypeColumn: {
     gap: theme.spacing.sm,
   },
   sessionTypeCard: {
-    flex: 1,
     padding: theme.spacing.md,
     borderRadius: theme.radius.lg,
     borderWidth: 1.5,
-    justifyContent: 'flex-start',
+  },
+  sessionTypeCardSelected: {
+    backgroundColor: theme.colors.surfaceElevated,
   },
   sessionTypeCardUnselected: {
     backgroundColor: theme.colors.surface,
     borderColor: theme.colors.border,
   },
-  sessionTypeCardSelected: {
-    backgroundColor: theme.colors.surfaceElevated,
-    ...theme.shadow.glow,
-  },
   cardPressed: {
-    transform: [{ scale: 0.98 }],
-    opacity: 0.9,
+    opacity: 0.85,
   },
   sessionTypeHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: theme.spacing.xs,
+    gap: theme.spacing.sm,
     marginBottom: theme.spacing.xs,
   },
   sessionTypeIcon: {
-    fontSize: 18,
+    fontSize: 20,
   },
   sessionTypeTitle: {
-    fontWeight: theme.typography.weight.bold,
-    fontSize: 14,
+    fontSize: theme.typography.size.md,
+    fontWeight: '700',
     color: theme.colors.text.primary,
+    flex: 1,
   },
   sessionTypeDesc: {
-    fontSize: 11,
-    lineHeight: 15,
+    lineHeight: 18,
+    marginTop: 2,
   },
   countSection: {
     marginBottom: theme.spacing.lg,
-  },
-  sectionLabel: {
-    marginBottom: theme.spacing.sm,
   },
   pillRow: {
     flexDirection: 'row',
     gap: theme.spacing.sm,
   },
-  countPill: {
+  pill: {
     flex: 1,
-    height: theme.touchTarget.md,
-    borderRadius: theme.radius.lg,
+    height: 48,
+    borderRadius: theme.radius.full,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1.5,
   },
-  countPillUnselected: {
-    backgroundColor: theme.colors.surface,
+  pillSelected: {
+    // Background dynamic by vibe
+  },
+  pillUnselected: {
+    backgroundColor: theme.colors.surfaceElevated,
+    borderWidth: 1,
     borderColor: theme.colors.border,
   },
-  countPillSelected: {
-    backgroundColor: theme.colors.accent,
-    borderColor: theme.colors.accent,
-    ...theme.shadow.glow,
+  pillPressed: {
+    opacity: 0.8,
+    transform: [{ scale: 0.96 }],
   },
-  countPillPressed: {
-    transform: [{ scale: 0.95 }],
-    opacity: 0.85,
+  pillText: {
+    fontSize: theme.typography.size.md,
+    fontWeight: '600',
   },
-  countPillText: {
+  pillTextSelected: {
+    color: theme.colors.bg,
+    fontWeight: '700',
+  },
+  pillTextUnselected: {
     color: theme.colors.text.secondary,
-    fontWeight: theme.typography.weight.bold,
   },
-  countPillTextSelected: {
-    color: theme.colors.accentForeground,
-  },
-  inputsList: {
-    gap: theme.spacing.md,
+  inputsSection: {
+    gap: theme.spacing.sm,
     marginBottom: theme.spacing.xl,
   },
-  inputItem: {
+  inputWrapper: {
     width: '100%',
   },
-  avatarDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
+  textInputContainer: {
+    backgroundColor: theme.colors.surfaceElevated,
   },
-  bottomArea: {
+  avatarIndicator: {
+    width: 28,
+    height: 28,
+    borderRadius: theme.radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: theme.spacing.xs,
+  },
+  avatarNumber: {
+    fontSize: theme.typography.size.xs,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  bottomCta: {
     marginTop: 'auto',
-    paddingTop: theme.spacing.sm,
+    paddingTop: theme.spacing.md,
   },
-  startButtonActive: {
-    ...theme.shadow.glow,
+  ctaButton: {
+    width: '100%',
   },
 });

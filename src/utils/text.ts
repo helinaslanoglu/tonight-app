@@ -24,16 +24,18 @@ export function normalizeQuestionText(text: string): string {
 
 /**
  * Computes a scoped, deterministic question identity key.
- * Format: `${vibeId}:${gameModeId}:${normalizedText}`
- *
- * This key ensures that questions with identical text in the same vibe & mode
- * are recognized as the same question, regardless of their generated runtime ID.
+ * - For canonical curated questions (e.g. "wyr-party-1"), returns the stable question ID across all languages.
+ * - For runtime/AI questions, returns `${vibeId}:${gameModeId}:${normalizedText}` to catch identical text.
  */
 export function getQuestionIdentity(q: {
+  id?: string;
   vibeId?: string;
   gameModeId?: string;
   text: string;
 }): string {
+  if (q.id && /^(wyr|mlt|ht|wkmb|open)-/.test(q.id)) {
+    return q.id;
+  }
   const vibe = q.vibeId || 'all';
   const mode = q.gameModeId || 'all';
   const cleanText = normalizeQuestionText(q.text);

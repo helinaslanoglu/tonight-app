@@ -9,7 +9,7 @@
  * 2. Deterministic ID generation prevents identical template generations from duplicating.
  */
 
-import type { GameModeId, Question, VibeId } from '@/types';
+import type { GameModeId, LanguageId, Question, VibeId } from '@/types';
 import type { AIGenerationParams, AIQuestionProvider } from '../types';
 
 interface PersonalizedTemplate {
@@ -308,11 +308,227 @@ const GROUP_TEMPLATES_BY_VIBE: Record<VibeId, PersonalizedTemplate[]> = {
   ],
 };
 
+interface LocalizedTextMap {
+  text: (p1: string, p2: string) => string;
+  optionA?: (p1: string, p2: string) => string;
+  optionB?: (p1: string, p2: string) => string;
+  agreeLabel?: string;
+  disagreeLabel?: string;
+  prompt?: (p1: string, p2: string) => string;
+}
+
+function getLocalizedTemplate(
+  base: {
+    mode: GameModeId;
+    text: (p1: string, p2: string, group: string) => string;
+    optionA?: (p1: string, p2: string) => string;
+    optionB?: (p1: string, p2: string) => string;
+    agreeLabel?: string;
+    disagreeLabel?: string;
+    prompt?: (p1: string, p2: string) => string;
+  },
+  language: LanguageId,
+  p1: string,
+  p2: string,
+  groupName: string,
+  index = 0
+): LocalizedTextMap {
+  if (language === 'tr') {
+    if (base.mode === 'would-you-rather') {
+      const wyrTrVariants = [
+        {
+          text: `${p1} ile plansız bir yolculuğa çıkmayı mı yoksa ${p2} ile baş başa akşam yemeğini mi tercih ederdin?`,
+          optA: `${p1} ile yolculuk`,
+          optB: `${p2} ile akşam yemeği`,
+        },
+        {
+          text: `${p1}’in müzik listesini 24 saat dinlemeyi mi yoksa ${p2}’nin sana kıyafet seçmesini mi tercih ederdin?`,
+          optA: `${p1}’in müzikleri`,
+          optB: `${p2}’nin kıyafet seçimi`,
+        },
+        {
+          text: `Bir sırrını ${p1}’e emanet etmeyi mi yoksa ${p2} ile bir hafta aynı evde kalmayı mı tercih ederdin?`,
+          optA: `${p1}’e sır vermek`,
+          optB: `${p2} ile aynı ev`,
+        },
+      ];
+      const v = wyrTrVariants[index % wyrTrVariants.length];
+      return {
+        text: () => v.text,
+        optionA: () => v.optA,
+        optionB: () => v.optB,
+      };
+    }
+    if (base.mode === 'most-likely-to') {
+      const mltTrVariants = [
+        `${p1} ve ${p2} arasında hangisi bu grupta en çılgın fikri ilk ortaya atar?`,
+        `${p1} ve ${p2} arasında hangisi gece yarısı herkesi arayıp dışarı çağırır?`,
+        `${p1} ve ${p2} arasında hangisi zor bir durumda daha sakin kalabilir?`,
+      ];
+      return {
+        text: () => mltTrVariants[index % mltTrVariants.length],
+      };
+    }
+    if (base.mode === 'hot-take') {
+      const htTrVariants = [
+        `${p1}, romantik veya gergin anlarda ${p2}'den çok daha hızlı utanır.`,
+        `${p1} ve ${p2} birlikte tatile çıksa ilk günden rotayı kaybederler.`,
+        `${p1} bu gruptaki herkesin sırrını en iyi saklayan kişidir.`,
+      ];
+      return {
+        text: () => htTrVariants[index % htTrVariants.length],
+        agreeLabel: 'KESİNLİKLE DOĞRU',
+        disagreeLabel: 'ASLA KATILMAM',
+      };
+    }
+    if (base.mode === 'who-knows-me-best') {
+      return {
+        text: () => `${p1} için en unutulmaz tatil veya seyahat hayali nedir?`,
+        prompt: () => `${p2} ilk tahmini yapar, sonra ${p1} gerçeği açıklar!`,
+      };
+    }
+    return {
+      text: () => `${p1} ve ${p2} ilk tanıştıklarında birbirleri hakkında ne düşünmüştü?`,
+      prompt: () => 'Tamamen dürüst olun — hiçbir şeyi saklamayın.',
+    };
+  }
+
+  if (language === 'fr') {
+    if (base.mode === 'would-you-rather') {
+      const wyrFrVariants = [
+        {
+          text: `Préfères-tu partir en voyage improvisé avec ${p1} ou dîner aux chandelles avec ${p2} ?`,
+          optA: `Voyage avec ${p1}`,
+          optB: `Dîner avec ${p2}`,
+        },
+        {
+          text: `Préfères-tu laisser ${p1} choisir ta tenue ou écouter la playlist de ${p2} en boucle pendant 24h ?`,
+          optA: `Tenue par ${p1}`,
+          optB: `Playlist de ${p2}`,
+        },
+        {
+          text: `Préfères-tu confier ton plus grand secret à ${p1} ou vivre en coloc avec ${p2} ?`,
+          optA: `Secret à ${p1}`,
+          optB: `Coloc avec ${p2}`,
+        },
+      ];
+      const v = wyrFrVariants[index % wyrFrVariants.length];
+      return {
+        text: () => v.text,
+        optionA: () => v.optA,
+        optionB: () => v.optB,
+      };
+    }
+    if (base.mode === 'most-likely-to') {
+      const mltFrVariants = [
+        `Entre ${p1} et ${p2}, qui est le plus susceptible de lancer une idée folle ?`,
+        `Entre ${p1} et ${p2}, qui est le plus susceptible de motiver tout le groupe à sortir ?`,
+        `Entre ${p1} et ${p2}, qui garde son calme le plus longtemps en situation de stress ?`,
+      ];
+      return {
+        text: () => mltFrVariants[index % mltFrVariants.length],
+      };
+    }
+    if (base.mode === 'hot-take') {
+      const htFrVariants = [
+        `${p1} stresse beaucoup plus vite que ${p2} quand la tension monte.`,
+        `Si ${p1} et ${p2} partaient en voyage ensemble, ils se disputeraient sur l'itinéraire dès le premier jour.`,
+        `${p1} est secrètement la personne la plus prudente de tout le groupe.`,
+      ];
+      return {
+        text: () => htFrVariants[index % htFrVariants.length],
+        agreeLabel: '100% VRAI',
+        disagreeLabel: 'PAS D’ACCORD',
+      };
+    }
+    if (base.mode === 'who-knows-me-best') {
+      return {
+        text: () => `Quel est le plus grand point faible romantique de ${p1} ?`,
+        prompt: () => `${p2} devine en premier avant la révélation de ${p1} !`,
+      };
+    }
+    return {
+      text: () => `Quelle a été la toute première impression de ${p1} en rencontrant ${p2} ?`,
+      prompt: () => 'Soyez 100% honnêtes — sans filtre.',
+    };
+  }
+
+  if (language === 'ar') {
+    if (base.mode === 'would-you-rather') {
+      const wyrArVariants = [
+        {
+          text: `هل تفضل الذهاب في رحلة عفوية مع ${p1} أو تناول عشاء هادئ مع ${p2}؟`,
+          optA: `رحلة مع ${p1}`,
+          optB: `عشاء مع ${p2}`,
+        },
+        {
+          text: `هل تفضل أن يختار ${p1} ملابسك ليوم كامل أو الاستماع لأغاني ${p2} فقط طوال اليوم؟`,
+          optA: `ملابس من ${p1}`,
+          optB: `أغاني ${p2}`,
+        },
+        {
+          text: `هل تفضل إخبار ${p1} بأكبر سر لديك أو السكن في شقة واحدة مع ${p2} لأسبوع؟`,
+          optA: `سر لـ ${p1}`,
+          optB: `سكن مع ${p2}`,
+        },
+      ];
+      const v = wyrArVariants[index % wyrArVariants.length];
+      return {
+        text: () => v.text,
+        optionA: () => v.optA,
+        optionB: () => v.optB,
+      };
+    }
+    if (base.mode === 'most-likely-to') {
+      const mltArVariants = [
+        `بين ${p1} و ${p2}، من الأكثر ترجيحاً أن يقترح خطة جنونية أولاً؟`,
+        `بين ${p1} و ${p2}، من الأكثر ترجيحاً أن يحمس الجميع للخروج في منتصف الليل؟`,
+        `بين ${p1} و ${p2}، من الأكثر هدوءاً وقدرة على حل المشاكل؟`,
+      ];
+      return {
+        text: () => mltArVariants[index % mltArVariants.length],
+      };
+    }
+    if (base.mode === 'hot-take') {
+      const htArVariants = [
+        `${p1} يرتبك أسرع بكثير من ${p2} في المواقف المحرجة والمفاجئة.`,
+        `لو سافر ${p1} و ${p2} معاً، لضاعا عن الطريق في اليوم الأول بالتأكيد.`,
+        `${p1} هو الشخص الأكثر حفظاً لأسرار المجموعة دون أدنى شك.`,
+      ];
+      return {
+        text: () => htArVariants[index % htArVariants.length],
+        agreeLabel: 'حقيقة 100%',
+        disagreeLabel: 'غير صحيح',
+      };
+    }
+    if (base.mode === 'who-knows-me-best') {
+      return {
+        text: () => `ما هي أمنية السفر المفضلة والأهم لدى ${p1}؟`,
+        prompt: () => `ليخمن ${p2} أولاً قبل أن يكشف ${p1} الحقيقة!`,
+      };
+    }
+    return {
+      text: () => `ما هو أول انطباع خطَر في بال ${p1} عند لقاء ${p2} لأول مرة؟`,
+      prompt: () => 'كونوا صادقين تماماً دون تردد.',
+    };
+  }
+
+  // Default: English
+  return {
+    text: () => base.text(p1, p2, groupName),
+    optionA: base.optionA ? () => base.optionA!(p1, p2) : undefined,
+    optionB: base.optionB ? () => base.optionB!(p1, p2) : undefined,
+    agreeLabel: base.agreeLabel,
+    disagreeLabel: base.disagreeLabel,
+    prompt: base.prompt ? () => base.prompt!(p1, p2) : undefined,
+  };
+}
+
 export class LocalSynthesizerProvider implements AIQuestionProvider {
   readonly name = 'LocalSynthesizer';
 
   async generateQuestions(params: AIGenerationParams): Promise<Question[]> {
-    const { vibeId, players, gameModeId = 'all', count = 6 } = params;
+    const { vibeId, players, gameModeId = 'all', count = 6, language = 'en' } = params;
     if (!players || players.length < 2) return [];
 
     const isDuo = players.length === 2;
@@ -349,49 +565,56 @@ export class LocalSynthesizerProvider implements AIQuestionProvider {
       const p2 = playerNames[p2Index] || 'Player 2';
       const groupName = isDuo ? 'you two' : 'the group';
 
+      const localized = getLocalizedTemplate(template, language, p1, p2, groupName, i);
+
       // Deterministic question ID ensures identical generations across sessions are caught by deduplicator
-      const qId = `ai-${vibeId}-${template.mode}-${templateIdx}-${sortedPlayerIds}`;
+      const qId = `ai-${language}-${vibeId}-${template.mode}-${templateIdx}-${i}-${sortedPlayerIds}`;
 
       if (template.mode === 'would-you-rather') {
         questions.push({
           id: qId,
           vibeId,
           gameModeId: 'would-you-rather',
-          text: template.text(p1, p2, groupName),
-          optionA: template.optionA ? template.optionA(p1, p2) : `Choice with ${p1}`,
-          optionB: template.optionB ? template.optionB(p1, p2) : `Choice with ${p2}`,
+          language,
+          text: localized.text(p1, p2),
+          optionA: localized.optionA ? localized.optionA(p1, p2) : `Choice with ${p1}`,
+          optionB: localized.optionB ? localized.optionB(p1, p2) : `Choice with ${p2}`,
         });
       } else if (template.mode === 'most-likely-to') {
         questions.push({
           id: qId,
           vibeId,
           gameModeId: 'most-likely-to',
-          text: template.text(p1, p2, groupName),
+          language,
+          text: localized.text(p1, p2),
         });
       } else if (template.mode === 'hot-take') {
         questions.push({
           id: qId,
           vibeId,
           gameModeId: 'hot-take',
-          text: template.text(p1, p2, groupName),
-          agreeLabel: template.agreeLabel || 'AGREE',
-          disagreeLabel: template.disagreeLabel || 'DISAGREE',
+          language,
+          text: localized.text(p1, p2),
+          agreeLabel: localized.agreeLabel || 'AGREE',
+          disagreeLabel: localized.disagreeLabel || 'DISAGREE',
         });
       } else if (template.mode === 'who-knows-me-best') {
         questions.push({
           id: qId,
           vibeId,
           gameModeId: 'who-knows-me-best',
-          text: template.text(p1, p2, groupName),
-          prompt: template.prompt ? template.prompt(p1, p2) : 'Guess the truth!',
+          language,
+          text: localized.text(p1, p2),
+          prompt: localized.prompt ? localized.prompt(p1, p2) : 'Guess the truth!',
         });
       } else {
         questions.push({
           id: qId,
           vibeId,
           gameModeId: 'open-question',
-          text: template.text(p1, p2, groupName),
-          prompt: template.prompt ? template.prompt(p1, p2) : 'Share your honest thoughts.',
+          language,
+          text: localized.text(p1, p2),
+          prompt: localized.prompt ? localized.prompt(p1, p2) : 'Share your honest thoughts.',
         });
       }
     }

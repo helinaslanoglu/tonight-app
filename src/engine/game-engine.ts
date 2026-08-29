@@ -17,6 +17,7 @@ import type {
   GameMode,
   GameModeId,
   GameSession,
+  LanguageId,
   Player,
   Question,
   RoundAnswer,
@@ -194,6 +195,7 @@ export function validateAnswerForQuestion(
 export interface StartSessionParams {
   vibeId: VibeId;
   players: Player[];
+  language?: LanguageId;
   sessionType?: SessionType;
   gameModeId?: GameModeId | 'all';
   totalRounds?: number;
@@ -208,6 +210,7 @@ export interface StartSessionParams {
 export function startNewSession({
   vibeId,
   players,
+  language = 'en',
   sessionType = 'standard',
   gameModeId = 'all',
   totalRounds = DEFAULT_TOTAL_ROUNDS,
@@ -231,6 +234,7 @@ export function startNewSession({
     id: generateSessionId(),
     sessionType,
     status: 'playing',
+    language,
     vibeId,
     gameModeId,
     players,
@@ -325,6 +329,7 @@ export function replaySession(
     id: generateSessionId(),
     sessionType: session.sessionType || 'standard',
     status: 'playing',
+    language: session.language || 'en',
     vibeId: session.vibeId,
     gameModeId: session.gameModeId || 'all',
     players: session.players,

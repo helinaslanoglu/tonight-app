@@ -120,7 +120,7 @@ export class AIService {
       // 3. Schema Validation & Sanitization Pipeline
       const validatedQuestions: Question[] = [];
       for (const raw of rawQuestions) {
-        const validation = validateAndSanitizeQuestion(raw);
+        const validation = validateAndSanitizeQuestion(raw, params.language);
         if (validation.isValid && validation.sanitizedQuestion) {
           validatedQuestions.push(validation.sanitizedQuestion);
         } else {
