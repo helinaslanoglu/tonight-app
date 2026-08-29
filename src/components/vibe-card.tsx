@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { AppText } from '@/components/ui/AppText';
 import { getVibeColor, theme } from '@/theme';
 import type { Vibe } from '@/types';
+import { haptic } from '@/utils';
 
 export interface VibeCardProps {
   vibe: Vibe;
@@ -14,9 +15,14 @@ export interface VibeCardProps {
 export function VibeCard({ vibe, selected, onSelect }: VibeCardProps) {
   const vibeColor = getVibeColor(vibe.id);
 
+  const handlePress = () => {
+    haptic.selection().catch(() => {});
+    onSelect();
+  };
+
   return (
     <Pressable
-      onPress={onSelect}
+      onPress={handlePress}
       accessibilityRole="radio"
       accessibilityState={{ selected }}
       accessibilityLabel={`${vibe.label} vibe. ${vibe.description}`}

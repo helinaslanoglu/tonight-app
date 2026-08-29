@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { AppText } from '@/components/ui/AppText';
 import { theme } from '@/theme';
 import type { HotTakeQuestion } from '@/types';
+import { haptic } from '@/utils';
 
 interface HotTakeInteractionProps {
   question: HotTakeQuestion;
@@ -19,6 +20,11 @@ export function HotTakeInteraction({
   const agreeText = question.agreeLabel || 'AGREE';
   const disagreeText = question.disagreeLabel || 'DISAGREE';
 
+  const handleSelect = (stance: 'agree' | 'disagree') => {
+    haptic.selection().catch(() => {});
+    onSelectStance(stance);
+  };
+
   return (
     <View style={styles.container}>
       <AppText variant="caption" color="secondary" style={styles.prompt}>
@@ -28,14 +34,15 @@ export function HotTakeInteraction({
       <View style={styles.row}>
         {/* AGREE / FACTS */}
         <Pressable
-          onPress={() => onSelectStance('agree')}
+          onPress={() => handleSelect('agree')}
           accessibilityRole="radio"
           accessibilityState={{ selected: selectedStance === 'agree' }}
           accessibilityLabel={`Agree: ${agreeText}`}
-          style={[
+          style={({ pressed }) => [
             styles.stanceCard,
             styles.agreeCard,
             selectedStance === 'agree' ? styles.agreeSelected : styles.cardUnselected,
+            pressed && styles.stancePressed,
           ]}
         >
           <AppText style={styles.stanceEmoji}>🔥</AppText>
@@ -52,14 +59,15 @@ export function HotTakeInteraction({
 
         {/* DISAGREE / CAP */}
         <Pressable
-          onPress={() => onSelectStance('disagree')}
+          onPress={() => handleSelect('disagree')}
           accessibilityRole="radio"
           accessibilityState={{ selected: selectedStance === 'disagree' }}
           accessibilityLabel={`Disagree: ${disagreeText}`}
-          style={[
+          style={({ pressed }) => [
             styles.stanceCard,
             styles.disagreeCard,
             selectedStance === 'disagree' ? styles.disagreeSelected : styles.cardUnselected,
+            pressed && styles.stancePressed,
           ]}
         >
           <AppText style={styles.stanceEmoji}>🚫</AppText>
@@ -109,7 +117,7 @@ const styles = StyleSheet.create({
   },
   agreeSelected: {
     backgroundColor: theme.colors.surfaceElevated,
-    borderColor: '#F59E0B', // Warm amber glow for hot takes
+    borderColor: '#F59E0B',
     ...theme.shadow.glow,
   },
   disagreeCard: {
@@ -119,6 +127,10 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.surfaceElevated,
     borderColor: theme.colors.destructive,
     ...theme.shadow.glow,
+  },
+  stancePressed: {
+    opacity: 0.85,
+    transform: [{ scale: 0.96 }],
   },
   stanceEmoji: {
     fontSize: 28,

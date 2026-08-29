@@ -19,7 +19,7 @@ import { VIBES } from '@/data';
 import { usePlayers, useSelectedVibe, useSetPlayers } from '@/store';
 import { getVibeColor, theme } from '@/theme';
 import type { Player } from '@/types';
-import { generatePlayerId } from '@/utils';
+import { generatePlayerId, haptic } from '@/utils';
 
 const PLAYER_COUNT_OPTIONS = [2, 3, 4, 5, 6] as const;
 type PlayerCount = (typeof PLAYER_COUNT_OPTIONS)[number];
@@ -172,14 +172,18 @@ export default function GameSetupScreen() {
               return (
                 <Pressable
                   key={count}
-                  onPress={() => setPlayerCount(count)}
+                  onPress={() => {
+                    haptic.selection().catch(() => {});
+                    setPlayerCount(count);
+                  }}
                   accessibilityRole="radio"
                   accessibilityState={{ selected: isSelected }}
                   accessibilityLabel={`${count} players`}
                   accessibilityHint="Selects number of players to join the game"
-                  style={[
+                  style={({ pressed }) => [
                     styles.countPill,
                     isSelected ? styles.countPillSelected : styles.countPillUnselected,
+                    pressed && styles.countPillPressed,
                   ]}
                 >
                   <AppText
@@ -297,6 +301,10 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.accent,
     borderColor: theme.colors.accent,
     ...theme.shadow.glow,
+  },
+  countPillPressed: {
+    transform: [{ scale: 0.95 }],
+    opacity: 0.85,
   },
   countPillText: {
     color: theme.colors.text.secondary,

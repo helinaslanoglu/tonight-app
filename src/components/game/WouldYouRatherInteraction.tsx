@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { AppText } from '@/components/ui/AppText';
 import { theme } from '@/theme';
 import type { WouldYouRatherQuestion } from '@/types';
+import { haptic } from '@/utils';
 
 interface WouldYouRatherInteractionProps {
   question: WouldYouRatherQuestion;
@@ -16,16 +17,22 @@ export function WouldYouRatherInteraction({
   selectedOption,
   onSelectOption,
 }: WouldYouRatherInteractionProps) {
+  const handleSelect = (option: 'A' | 'B') => {
+    haptic.selection().catch(() => {});
+    onSelectOption(option);
+  };
+
   return (
     <View style={styles.container}>
       <Pressable
-        onPress={() => onSelectOption('A')}
+        onPress={() => handleSelect('A')}
         accessibilityRole="radio"
         accessibilityState={{ selected: selectedOption === 'A' }}
         accessibilityLabel={`Option A: ${question.optionA}`}
-        style={[
+        style={({ pressed }) => [
           styles.optionCard,
           selectedOption === 'A' ? styles.optionSelected : styles.optionUnselected,
+          pressed && styles.optionPressed,
         ]}
       >
         <AppText variant="overline" color="secondary" style={styles.optionTag}>
@@ -46,13 +53,14 @@ export function WouldYouRatherInteraction({
       </View>
 
       <Pressable
-        onPress={() => onSelectOption('B')}
+        onPress={() => handleSelect('B')}
         accessibilityRole="radio"
         accessibilityState={{ selected: selectedOption === 'B' }}
         accessibilityLabel={`Option B: ${question.optionB}`}
-        style={[
+        style={({ pressed }) => [
           styles.optionCard,
           selectedOption === 'B' ? styles.optionSelected : styles.optionUnselected,
+          pressed && styles.optionPressed,
         ]}
       >
         <AppText variant="overline" color="secondary" style={styles.optionTag}>
@@ -89,6 +97,10 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.surfaceElevated,
     borderColor: theme.colors.accent,
     ...theme.shadow.glow,
+  },
+  optionPressed: {
+    opacity: 0.85,
+    transform: [{ scale: 0.98 }],
   },
   optionTag: {
     marginBottom: 4,

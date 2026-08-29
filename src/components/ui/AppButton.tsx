@@ -1,21 +1,5 @@
 /**
- * AppButton — Tonight's reusable button component.
- *
- * Variants:
- *   primary   — filled accent background (main CTA)
- *   secondary — subtle surface background (secondary action)
- *   ghost     — transparent background, accent-colored label
- *   destructive — red, for irreversible actions
- *
- * Sizes:
- *   sm | md | lg
- *
- * Usage:
- *   <AppButton onPress={...}>Start Game</AppButton>
- *   <AppButton variant="ghost" onPress={...}>Skip</AppButton>
- *   <AppButton variant="secondary" size="sm" onPress={...}>Cancel</AppButton>
- *   <AppButton loading onPress={...}>Saving...</AppButton>
- *   <AppButton disabled onPress={...}>Locked</AppButton>
+ * AppButton — Tonight's reusable button component with tactile feedback.
  */
 
 import React from 'react';
@@ -23,12 +7,14 @@ import {
   ActivityIndicator,
   Pressable,
   StyleSheet,
+  type GestureResponderEvent,
   type PressableProps,
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
 
 import { theme } from '@/theme';
+import { haptic } from '@/utils';
 import { AppText } from './AppText';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -43,6 +29,8 @@ export interface AppButtonProps extends Omit<PressableProps, 'style'> {
   loading?: boolean;
   /** Full-width block button */
   fullWidth?: boolean;
+  /** Optional haptic feedback control (defaults to true) */
+  enableHaptic?: boolean;
   style?: StyleProp<ViewStyle>;
   children: React.ReactNode;
 }
@@ -104,11 +92,25 @@ export function AppButton({
   loading = false,
   fullWidth = false,
   disabled = false,
+  enableHaptic = true,
+  onPress,
   style,
   children,
   ...rest
 }: AppButtonProps) {
   const isDisabled = disabled || loading;
+
+  const handlePress = (e: GestureResponderEvent) => {
+    if (isDisabled) return;
+    if (enableHaptic) {
+      if (variant === 'primary' && size === 'lg') {
+        haptic.impactMedium().catch(() => {});
+      } else {
+        haptic.impactLight().catch(() => {});
+      }
+    }
+    onPress?.(e);
+  };
 
   return (
     <Pressable
@@ -122,6 +124,7 @@ export function AppButton({
         style,
       ]}
       disabled={isDisabled}
+      onPress={handlePress}
       accessibilityRole="button"
       accessibilityState={{ disabled: isDisabled, busy: loading }}
       {...rest}
@@ -153,8 +156,8 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   pressed: {
-    opacity: 0.75,
-    transform: [{ scale: 0.98 }],
+    opacity: 0.85,
+    transform: [{ scale: 0.97 }],
   },
   disabled: {
     opacity: 0.4,

@@ -1,11 +1,11 @@
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Alert,
   StyleSheet,
   View,
 } from 'react-native';
-import Animated, { FadeIn } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 
 import {
   HotTakeInteraction,
@@ -41,6 +41,7 @@ import type {
   WhoKnowsMeBestQuestion,
   WouldYouRatherQuestion,
 } from '@/types';
+import { haptic } from '@/utils';
 
 export default function GameScreen() {
   const router = useRouter();
@@ -67,6 +68,13 @@ export default function GameScreen() {
   const vibeColor = selectedVibeId ? getVibeColor(selectedVibeId) : theme.colors.accent;
   const currentMode = GAME_MODES.find((m) => m.id === currentQuestion?.gameModeId);
 
+  // Trigger celebration haptic on game completion
+  useEffect(() => {
+    if (isCompleted) {
+      haptic.success().catch(() => {});
+    }
+  }, [isCompleted]);
+
   // Validation
   const canAdvance = validateAnswerForQuestion(currentQuestion, {
     selectedOption,
@@ -77,6 +85,7 @@ export default function GameScreen() {
   const handleNext = async () => {
     if (!canAdvance || isAdvancing) return;
 
+    haptic.impactMedium().catch(() => {});
     setIsAdvancing(true);
     await answerAndAdvance({
       selectedOption,
@@ -94,6 +103,7 @@ export default function GameScreen() {
   };
 
   const handleReplay = async () => {
+    haptic.impactMedium().catch(() => {});
     setSelectedOption(undefined);
     setSelectedPlayerId(undefined);
     setSelectedStance(undefined);
@@ -227,6 +237,7 @@ export default function GameScreen() {
 
   // ─── Active Playing State ─────────────────────────────────────────────────
   const isLastRound = currentRound >= totalRounds;
+  const progressPercent = Math.min(100, Math.max(10, (currentRound / totalRounds) * 100));
 
   return (
     <ScreenContainer scrollable contentStyle={styles.container}>
@@ -256,6 +267,16 @@ export default function GameScreen() {
         />
       </View>
 
+      {/* Progress Track */}
+      <View style={styles.progressTrack}>
+        <View
+          style={[
+            styles.progressFill,
+            { width: `${progressPercent}%`, backgroundColor: vibeColor },
+          ]}
+        />
+      </View>
+
       {/* Mode Identifier */}
       <Animated.View entering={FadeIn.duration(300)} style={styles.modeRow}>
         <AppText variant="overline" color="secondary" style={styles.modeLabel}>
@@ -263,9 +284,13 @@ export default function GameScreen() {
         </AppText>
       </Animated.View>
 
-      {/* Question Card */}
+      {/* Question Card & Interaction Area */}
       {currentQuestion ? (
-        <Animated.View key={currentQuestion.id} entering={FadeIn.duration(400)} style={styles.questionSection}>
+        <Animated.View
+          key={currentQuestion.id}
+          entering={FadeInDown.duration(280)}
+          style={styles.questionSection}
+        >
           <AppCard variant="elevated" padding="xl" glow style={styles.questionCard}>
             <AppText variant="heading" style={styles.questionText}>
               {currentQuestion.text}
@@ -351,7 +376,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    marginBottom: theme.spacing.xs,
+  },
+  progressTrack: {
+    height: 4,
+    backgroundColor: theme.colors.surfaceElevated,
+    borderRadius: 2,
     marginBottom: theme.spacing.md,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 2,
   },
   exitIcon: {
     fontSize: 14,

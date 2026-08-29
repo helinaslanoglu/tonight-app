@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { AppText } from '@/components/ui/AppText';
 import { theme } from '@/theme';
 import type { Player } from '@/types';
+import { haptic } from '@/utils';
 
 interface MostLikelyToInteractionProps {
   players: Player[];
@@ -16,6 +17,11 @@ export function MostLikelyToInteraction({
   selectedPlayerId,
   onSelectPlayer,
 }: MostLikelyToInteractionProps) {
+  const handleSelect = (playerId: string) => {
+    haptic.selection().catch(() => {});
+    onSelectPlayer(playerId);
+  };
+
   return (
     <View style={styles.container}>
       <AppText variant="caption" color="secondary" style={styles.prompt}>
@@ -29,15 +35,16 @@ export function MostLikelyToInteraction({
           return (
             <Pressable
               key={player.id}
-              onPress={() => onSelectPlayer(player.id)}
+              onPress={() => handleSelect(player.id)}
               accessibilityRole="radio"
               accessibilityState={{ selected: isSelected }}
               accessibilityLabel={`Vote for ${player.name}`}
-              style={[
+              style={({ pressed }) => [
                 styles.playerCard,
                 isSelected
                   ? [styles.playerCardSelected, { borderColor: pColor }]
                   : styles.playerCardUnselected,
+                pressed && styles.playerCardPressed,
               ]}
             >
               <View style={[styles.playerAvatar, { backgroundColor: pColor }]}>
@@ -93,6 +100,10 @@ const styles = StyleSheet.create({
   playerCardSelected: {
     backgroundColor: theme.colors.surfaceElevated,
     ...theme.shadow.glow,
+  },
+  playerCardPressed: {
+    opacity: 0.85,
+    transform: [{ scale: 0.96 }],
   },
   playerAvatar: {
     width: 28,

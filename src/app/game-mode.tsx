@@ -22,6 +22,7 @@ import {
 } from '@/store';
 import { getVibeColor, theme } from '@/theme';
 import type { GameModeId } from '@/types';
+import { haptic } from '@/utils';
 
 export default function GameModeScreen() {
   const router = useRouter();
@@ -81,13 +82,17 @@ export default function GameModeScreen() {
       <Animated.View entering={FadeIn.duration(450)} style={styles.modeList}>
         {/* 1. MIX ALL MODES (Surprise Me) */}
         <Pressable
-          onPress={() => setSelectedMode('all')}
+          onPress={() => {
+            haptic.selection().catch(() => {});
+            setSelectedMode('all');
+          }}
           accessibilityRole="radio"
           accessibilityState={{ selected: selectedMode === 'all' }}
           accessibilityLabel="Mix all modes. Automatic shuffle of all compatible game modes."
-          style={[
+          style={({ pressed }) => [
             styles.modeCard,
             selectedMode === 'all' ? [styles.modeCardSelected, { borderColor: vibeColor }] : styles.modeCardUnselected,
+            pressed && styles.modeCardPressed,
           ]}
         >
           <View style={styles.cardHeaderRow}>
@@ -126,16 +131,21 @@ export default function GameModeScreen() {
             <Pressable
               key={mode.id}
               disabled={!isEnabled}
-              onPress={() => isEnabled && setSelectedMode(mode.id)}
+              onPress={() => {
+                if (!isEnabled) return;
+                haptic.selection().catch(() => {});
+                setSelectedMode(mode.id);
+              }}
               accessibilityRole="radio"
               accessibilityState={{ selected: isSelected, disabled: !isEnabled }}
               accessibilityLabel={`${mode.label}. ${mode.tagline}`}
-              style={[
+              style={({ pressed }) => [
                 styles.modeCard,
                 isSelected
                   ? [styles.modeCardSelected, { borderColor: vibeColor }]
                   : styles.modeCardUnselected,
                 !isEnabled && styles.modeCardDisabled,
+                pressed && isEnabled && styles.modeCardPressed,
               ]}
             >
               <View style={styles.cardHeaderRow}>
@@ -228,6 +238,10 @@ const styles = StyleSheet.create({
   },
   modeCardDisabled: {
     opacity: 0.45,
+  },
+  modeCardPressed: {
+    opacity: 0.85,
+    transform: [{ scale: 0.985 }],
   },
   cardHeaderRow: {
     flexDirection: 'row',

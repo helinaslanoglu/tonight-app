@@ -5,6 +5,7 @@ import { AppCard } from '@/components/ui/AppCard';
 import { AppText } from '@/components/ui/AppText';
 import { theme } from '@/theme';
 import type { Player, WhoKnowsMeBestQuestion } from '@/types';
+import { haptic } from '@/utils';
 
 interface WhoKnowsMeBestInteractionProps {
   question: WhoKnowsMeBestQuestion;
@@ -23,6 +24,11 @@ export function WhoKnowsMeBestInteraction({
   const activeSpotlightId = spotlightPlayerId || players[0]?.id;
   const activePlayer = players.find((p) => p.id === activeSpotlightId) || players[0];
   const pColor = activePlayer?.color || theme.colors.accent;
+
+  const handleSwitchPlayer = (id: string) => {
+    haptic.selection().catch(() => {});
+    onSelectSpotlightPlayer(id);
+  };
 
   return (
     <View style={styles.container}>
@@ -66,12 +72,13 @@ export function WhoKnowsMeBestInteraction({
             return (
               <Pressable
                 key={p.id}
-                onPress={() => onSelectSpotlightPlayer(p.id)}
+                onPress={() => handleSwitchPlayer(p.id)}
                 accessibilityRole="button"
                 accessibilityLabel={`Set spotlight on ${p.name}`}
-                style={[
+                style={({ pressed }) => [
                   styles.rosterChip,
                   isSelected && [styles.rosterChipSelected, { borderColor: p.color || theme.colors.accent }],
+                  pressed && styles.rosterChipPressed,
                 ]}
               >
                 <View style={[styles.chipDot, { backgroundColor: p.color || theme.colors.accent }]} />
@@ -154,6 +161,10 @@ const styles = StyleSheet.create({
   rosterChipSelected: {
     backgroundColor: theme.colors.surfaceElevated,
     ...theme.shadow.glow,
+  },
+  rosterChipPressed: {
+    opacity: 0.8,
+    transform: [{ scale: 0.94 }],
   },
   chipDot: {
     width: 8,

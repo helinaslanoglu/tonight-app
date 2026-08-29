@@ -12,6 +12,7 @@ import {
   fontSizeTokens,
   fontWeightTokens,
   lineHeightTokens,
+  motionTokens,
   radiusTokens,
   shadowTokens,
   spacingTokens,
@@ -75,6 +76,7 @@ export const theme = {
 
   duration: durationTokens,
   easing: easingNames,
+  motion: motionTokens,
 
   touchTarget: touchTargetTokens,
 } as const;

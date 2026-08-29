@@ -148,6 +148,23 @@ export const easingNames = {
   accelerate: 'easeIn',
 } as const;
 
+// ─── Motion ───────────────────────────────────────────────────────────────────
+
+export const motionTokens = {
+  duration: {
+    instant: 120,
+    fast: 220,
+    normal: 320,
+    slow: 450,
+    celebration: 650,
+  },
+  scale: {
+    pressed: 0.97,
+    activeCard: 0.98,
+    badge: 1.05,
+  },
+} as const;
+
 // ─── Touch targets ────────────────────────────────────────────────────────────
 
 export const touchTargetTokens = {
